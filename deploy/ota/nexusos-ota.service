@@ -20,3 +20,6 @@ ProtectHome=true
 ReadWritePaths=/var/log/nexusos /var/lib/nexusos /etc/nexusos /tmp
 NoNewPrivileges=false
 CapabilityBoundingSet=CAP_SYS_ADMIN CAP_FOWNER CAP_DAC_OVERRIDE
+
+[Install]
+WantedBy=multi-user.target

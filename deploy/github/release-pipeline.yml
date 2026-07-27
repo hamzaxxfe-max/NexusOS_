@@ -25,6 +25,14 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Cache pacman packages
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/pacman/pkg
+          key: ${{ runner.os }}-pacman-${{ steps.version.outputs.version }}
+          restore-keys: |
+            ${{ runner.os }}-pacman-
+
       - name: Extract version from tag
         id: version
         run: |

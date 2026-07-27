@@ -1,0 +1,21 @@
+{
+  "enabled": true,
+  "wallpaper_dir": "/usr/share/nexusos/live-wallpapers",
+  "user_wallpaper_dir": "~/Videos/NexusOS-Wallpapers",
+  "current_wallpaper": "",
+  "playback_mode": "single",
+  "cycle_interval_sec": 300,
+  "crossfade_duration_sec": 2,
+  "volume": 50,
+  "mute": false,
+  "pause_on_game": true,
+  "focus_poll_interval_sec": 2,
+  "hw_decoding": "auto",
+  "vo_backend": "auto",
+  "max_fps": 30,
+  "idle_dim_sec": 60,
+  "idle_dim_alpha": 0.5,
+  "tray_icon": true,
+  "randomize": false,
+  "loop": true
+}

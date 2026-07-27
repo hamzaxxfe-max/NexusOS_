@@ -10,14 +10,26 @@ from pathlib import Path
 
 PROJ_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS_DIR = PROJ_ROOT / ".github" / "workflows"
-PIPELINE_FILE = WORKFLOWS_DIR / "release-pipeline.yml"
-PAGES_FILE = WORKFLOWS_DIR / "pages-deploy.yml"
+DEPLOY_DIR = PROJ_ROOT / "deploy" / "github"
+OTA_DIR = PROJ_ROOT / "deploy" / "ota"
+PIPELINE_FILE = DEPLOY_DIR / "release-pipeline.yml"
+if not PIPELINE_FILE.exists():
+    PIPELINE_FILE = WORKFLOWS_DIR / "release-pipeline.yml"
+PAGES_FILE = DEPLOY_DIR / "pages-deploy.yml"
+if not PAGES_FILE.exists():
+    PAGES_FILE = WORKFLOWS_DIR / "pages-deploy.yml"
 BUILDER_SCRIPT = PROJ_ROOT / "NexusOS-Builder.sh"
-MANIFEST_FILE = PROJ_ROOT / "manifest.json"
+MANIFEST_FILE = OTA_DIR / "manifest.json"
+if not MANIFEST_FILE.exists():
+    MANIFEST_FILE = PROJ_ROOT / "manifest.json"
 LICENSE_FILE = PROJ_ROOT / "LICENSE"
 GITIGNORE_FILE = PROJ_ROOT / ".gitignore"
-OTA_SERVICE = PROJ_ROOT / "nexusos-ota.service"
-OTA_TIMER = PROJ_ROOT / "nexusos-ota.timer"
+OTA_SERVICE = OTA_DIR / "nexusos-ota.service"
+if not OTA_SERVICE.exists():
+    OTA_SERVICE = PROJ_ROOT / "nexusos-ota.service"
+OTA_TIMER = OTA_DIR / "nexusos-ota.timer"
+if not OTA_TIMER.exists():
+    OTA_TIMER = PROJ_ROOT / "nexusos-ota.timer"
 
 
 def _read_file(path):
@@ -37,7 +49,10 @@ def _find_workflow(name):
     path = WORKFLOWS_DIR / name
     if path.exists():
         return path
-    return _find_file(name, WORKFLOWS_DIR)
+    path = DEPLOY_DIR / name
+    if path.exists():
+        return path
+    return _find_file(name, PROJ_ROOT)
 
 
 def _parse_yaml_simple(content):

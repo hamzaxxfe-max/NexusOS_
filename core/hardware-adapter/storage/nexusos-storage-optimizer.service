@@ -1,0 +1,14 @@
+[Unit]
+Description=NexusOS Storage Optimizer
+After=local-fs.target
+Wants=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash /opt/nexusos/core/hardware-adapter/storage/storage-optimizer.sh
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
