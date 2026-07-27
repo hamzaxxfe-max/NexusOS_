@@ -1,0 +1,186 @@
+name: Release NexusOS ISO
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+env:
+  ISO_NAME: nexusos
+  BUILD_DIR: build
+
+jobs:
+  build-iso:
+    name: Build ISO Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          echo "version=$TAG" >> "$GITHUB_OUTPUT"
+          echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+          echo "Building NexusOS v$TAG"
+
+      - name: Install build dependencies
+        run: |
+          sudo pacman -Syu --noconfirm archiso dosfstools e2fsprogs libisoburn mtools squashfs-tools xz
+
+      - name: Build ISO
+        id: build
+        run: |
+          sudo bash deploy/github/build-iso.sh "${{ steps.version.outputs.version }}"
+          ISO_PATH="${BUILD_DIR}/${ISO_NAME}-${{ steps.version.outputs.version }}.iso"
+          if [ ! -f "$ISO_PATH" ]; then
+            echo "ISO not found at $ISO_PATH"
+            exit 1
+          fi
+          echo "iso_path=$ISO_PATH" >> "$GITHUB_OUTPUT"
+          FILE_SIZE=$(stat --printf="%s" "$ISO_PATH")
+          echo "iso_size=$FILE_SIZE" >> "$GITHUB_OUTPUT"
+          echo "ISO built: $ISO_PATH ($FILE_SIZE bytes)"
+
+      - name: Generate SHA256 checksum
+        id: checksum
+        run: |
+          ISO_PATH="${{ steps.build.outputs.iso_path }}"
+          SHA256=$(sha256sum "$ISO_PATH" | awk '{print $1}')
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+          echo "$SHA256  ${ISO_NAME}-${{ steps.version.outputs.version }}.iso" > "${BUILD_DIR}/SHA256SUMS"
+          echo "Checksum: $SHA256"
+
+      - name: Create GitHub Release
+        id: release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: NexusOS ${{ steps.version.outputs.version }}
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
+          generate_release_notes: true
+          files: |
+            ${{ steps.build.outputs.iso_path }}
+            ${{ env.BUILD_DIR }}/SHA256SUMS
+
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexusos-${{ steps.version.outputs.version }}-iso
+          path: ${{ steps.build.outputs.iso_path }}
+          retention-days: 30
+
+      - name: Upload checksum artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexusos-${{ steps.version.outputs.version }}-checksums
+          path: ${{ env.BUILD_DIR }}/SHA256SUMS
+          retention-days: 30
+
+  update-manifest:
+    name: Update Manifest
+    needs: build-iso
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Extract version info
+        id: version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          echo "version=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch build outputs
+        uses: actions/download-artifact@v4
+        with:
+          name: nexusos-${{ steps.version.outputs.version }}-checksums
+          path: /tmp/checksums
+
+      - name: Read checksum
+        id: checksum
+        run: |
+          if [ -f /tmp/checksums/SHA256SUMS ]; then
+            SHA256=$(head -1 /tmp/checksums/SHA256SUMS | awk '{print $1}')
+          else
+            SHA256="${{ steps.build.outputs.sha256 }}"
+          fi
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+          echo "Checksum for manifest: $SHA256"
+
+      - name: Update manifest.json
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          SHA256="${{ steps.checksum.outputs.sha256 }}"
+          TAG="${GITHUB_REF_NAME}"
+          REPO="${{ github.repository }}"
+          RELEASE_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${TAG}/nexusos-${VERSION}.iso"
+
+          if [ ! -f manifest.json ]; then
+            echo '{"latest_version":"","download_url":"","sha256":"","release_date":"","release_notes":"","min_required_version":"0.9.0","size":0,"incremental_patches":[]}' > manifest.json
+          fi
+
+          python3 -c "
+          import json, sys
+          with open('manifest.json','r') as f: m=json.load(f)
+          old=m.get('latest_version','')
+          m['latest_version']=sys.argv[1]
+          m['download_url']=sys.argv[2]
+          m['sha256']=sys.argv[3]
+          m['release_date']=sys.argv[4]
+          m['size']=int(sys.argv[5]) if sys.argv[5].isdigit() else m.get('size',0)
+          rn='Release '+sys.argv[1]
+          if old and old!=sys.argv[1]: rn+=f' (upgrade from {old})'
+          m['release_notes']=rn
+          if old and old!=sys.argv[1]:
+            ep=m.get('incremental_patches',[])
+            if not any(p['from_version']==old and p['to_version']==sys.argv[1] for p in ep):
+              ep.append({'from_version':old,'to_version':sys.argv[1],'patch_url':sys.argv[2].replace('.iso','.xdelta'),'sha256':'','size':0})
+            m['incremental_patches']=ep
+          with open('manifest.json','w') as f: json.dump(m,f,indent=4); f.write('\n')
+          print('Manifest updated: '+sys.argv[1])
+          " "$VERSION" "$DOWNLOAD_URL" "$SHA256" "$RELEASE_DATE" "2400"
+
+      - name: Commit manifest update
+        run: |
+          git config user.name "NexusOS CI"
+          git config user.email "ci@nexusos.dev"
+          git add manifest.json
+          if git diff --cached --quiet; then
+            echo "No manifest changes to commit"
+          else
+            git commit -m "chore: update manifest.json for v${{ steps.version.outputs.version }}"
+            git push origin main
+          fi
+
+  distribute:
+    name: Distribution Summary
+    needs: [build-iso, update-manifest]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Print release summary
+        run: |
+          echo "============================================"
+          echo "  NexusOS ${{ github.ref_name }} Released"
+          echo "============================================"
+          echo ""
+          echo "ISO: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
+          echo "Manifest: https://raw.githubusercontent.com/${{ github.repository }}/main/manifest.json"
+          echo "Pages: https://${{ github.repository_owner }}.github.io/nexusos/downloads/"
+          echo ""
+          echo "CDN: GitHub's built-in CDN handles ISO distribution."

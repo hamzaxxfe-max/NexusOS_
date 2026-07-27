@@ -1,0 +1,148 @@
+{
+  "version": 1,
+  "profiles": {
+    "fps": {
+      "name": "FPS Default",
+      "package": "",
+      "description": "First-Person Shooter template. Left stick bottom-left for WASD movement, right stick top-right for mouse aim. Tap zones bottom-right for shoot/jump/reload.",
+      "screen_width": 1280,
+      "screen_height": 720,
+      "touch_to_mouse": true,
+      "left_stick_zone": {
+        "x_min": 0.0,
+        "x_max": 0.35,
+        "y_min": 0.55,
+        "y_max": 1.0,
+        "sensitivity": 1.2,
+        "deadzone": 0.08
+      },
+      "right_stick_zone": {
+        "x_min": 0.45,
+        "x_max": 1.0,
+        "y_min": 0.0,
+        "y_max": 0.55,
+        "sensitivity": 0.8,
+        "deadzone": 0.05
+      },
+      "zones": [
+        {"x_min": 0.0, "x_max": 0.35, "y_min": 0.55, "y_max": 1.0, "action": "left_stick", "binding": "", "sensitivity": 1.2, "deadzone": 0.08},
+        {"x_min": 0.45, "x_max": 1.0, "y_min": 0.0, "y_max": 0.55, "action": "right_stick", "binding": "", "sensitivity": 0.8, "deadzone": 0.05},
+        {"x_min": 0.85, "x_max": 1.0, "y_min": 0.7, "y_max": 0.85, "action": "tap", "binding": "BTN_LEFT", "sensitivity": 1.0, "deadzone": 0.0},
+        {"x_min": 0.85, "x_max": 1.0, "y_min": 0.85, "y_max": 1.0, "action": "tap", "binding": "BTN_RIGHT", "sensitivity": 1.0, "deadzone": 0.0},
+        {"x_min": 0.75, "x_max": 0.85, "y_min": 0.7, "y_max": 0.85, "action": "tap", "binding": "KEY_R", "sensitivity": 1.0, "deadzone": 0.0},
+        {"x_min": 0.75, "x_max": 0.85, "y_min": 0.85, "y_max": 1.0, "action": "tap", "binding": "KEY_E", "sensitivity": 1.0, "deadzone": 0.0},
+        {"x_min": 0.65, "x_max": 0.75, "y_min": 0.7, "y_max": 0.85, "action": "tap", "binding": "KEY_F", "sensitivity": 1.0, "deadzone": 0.0},
+        {"x_min": 0.0, "x_max": 0.15, "y_min": 0.0, "y_max": 0.15, "action": "tap", "binding": "KEY_TAB", "sensitivity": 1.0, "deadzone": 0.0}
+      ],
+      "key_bindings": {
+        "KEY_W": "move_up",
+        "KEY_S": "move_down",
+        "KEY_A": "move_left",
+        "KEY_D": "move_right",
+        "KEY_SPACE": "jump",
+        "KEY_LEFTSHIFT": "sprint",
+        "KEY_R": "reload",
+        "KEY_F": "interact",
+        "KEY_E": "use_ability",
+        "KEY_TAB": "inventory",
+        "KEY_Q": "ability_1",
+        "BTN_LEFT": "fire",
+        "BTN_RIGHT": "aim_down_sights"
+      }
+    },
+    "moba": {
+      "name": "MOBA Default",
+      "package": "",
+      "description": "MOBA/RTS template. Left half tap to issue move commands (right-click). Bottom-right quadrants for Q/W/E/R abilities. Top-left for scoreboard.",
+      "screen_width": 1280,
+      "screen_height": 720,
+      "touch_to_mouse": true,
+      "zones": [
+        {"x_min": 0.0, "x_max": 0.5, "y_min": 0.0, "y_max": 1.0, "action": "tap", "binding": "BTN_RIGHT", "sensitivity": 1.0, "deadzone": 0.0},
+        {"x_min": 0.6, "x_max": 0.7, "y_min": 0.7, "y_max": 0.85, "action": "tap", "binding": "KEY_Q", "sensitivity": 1.0, "deadzone": 0.0},
+        {"x_min": 0.7, "x_max": 0.8, "y_min": 0.7, "y_max": 0.85, "action": "tap", "binding": "KEY_W", "sensitivity": 1.0, "deadzone": 0.0},
+        {"x_min": 0.8, "x_max": 0.9, "y_min": 0.7, "y_max": 0.85, "action": "tap", "binding": "KEY_E", "sensitivity": 1.0, "deadzone": 0.0},
+        {"x_min": 0.9, "x_max": 1.0, "y_min": 0.7, "y_max": 0.85, "action": "tap", "binding": "KEY_R", "sensitivity": 1.0, "deadzone": 0.0},
+        {"x_min": 0.6, "x_max": 0.7, "y_min": 0.85, "y_max": 1.0, "action": "tap", "binding": "BTN_LEFT", "sensitivity": 1.0, "deadzone": 0.0},
+        {"x_min": 0.7, "x_max": 0.8, "y_min": 0.85, "y_max": 1.0, "action": "tap", "binding": "KEY_D", "sensitivity": 1.0, "deadzone": 0.0},
+        {"x_min": 0.0, "x_max": 0.15, "y_min": 0.0, "y_max": 0.15, "action": "tap", "binding": "KEY_TAB", "sensitivity": 1.0, "deadzone": 0.0}
+      ],
+      "key_bindings": {
+        "BTN_RIGHT": "move_command",
+        "BTN_LEFT": "auto_attack",
+        "KEY_Q": "ability_1",
+        "KEY_W": "ability_2",
+        "KEY_E": "ability_3",
+        "KEY_R": "ultimate",
+        "KEY_D": "summoner_spell",
+        "KEY_TAB": "scoreboard"
+      }
+    },
+    "racing": {
+      "name": "Racing Default",
+      "package": "",
+      "description": "Racing game template. Left-center zone for tilt-to-steer. Bottom-right for gas pedal, bottom-left for brake, top-right for handbrake.",
+      "screen_width": 1280,
+      "screen_height": 720,
+      "touch_to_mouse": false,
+      "zones": [
+        {"x_min": 0.0, "x_max": 0.5, "y_min": 0.2, "y_max": 0.6, "action": "tilt_steer", "binding": "", "sensitivity": 1.5, "deadzone": 0.1},
+        {"x_min": 0.6, "x_max": 1.0, "y_min": 0.5, "y_max": 1.0, "action": "tap", "binding": "KEY_W", "sensitivity": 1.0, "deadzone": 0.0},
+        {"x_min": 0.0, "x_max": 0.4, "y_min": 0.6, "y_max": 1.0, "action": "tap", "binding": "KEY_S", "sensitivity": 1.0, "deadzone": 0.0},
+        {"x_min": 0.6, "x_max": 1.0, "y_min": 0.0, "y_max": 0.3, "action": "tap", "binding": "KEY_SPACE", "sensitivity": 1.0, "deadzone": 0.0},
+        {"x_min": 0.0, "x_max": 0.25, "y_min": 0.0, "y_max": 0.2, "action": "tap", "binding": "KEY_TAB", "sensitivity": 1.0, "deadzone": 0.0},
+        {"x_min": 0.5, "x_max": 0.7, "y_min": 0.3, "y_max": 0.5, "action": "tap", "binding": "KEY_E", "sensitivity": 1.0, "deadzone": 0.0}
+      ],
+      "key_bindings": {
+        "KEY_A": "steer_left",
+        "KEY_D": "steer_right",
+        "KEY_W": "gas",
+        "KEY_S": "brake",
+        "KEY_SPACE": "handbrake",
+        "KEY_TAB": "map",
+        "KEY_E": "nitro"
+      }
+    },
+    "rpg": {
+      "name": "RPG Default",
+      "package": "",
+      "description": "RPG/JRPG template. Left stick bottom-left for d-pad movement. Right side has attack/magic/defend/action buttons. Bottom-center for confirm and menu.",
+      "screen_width": 1280,
+      "screen_height": 720,
+      "touch_to_mouse": true,
+      "left_stick_zone": {
+        "x_min": 0.0,
+        "x_max": 0.3,
+        "y_min": 0.5,
+        "y_max": 1.0,
+        "sensitivity": 1.0,
+        "deadzone": 0.1
+      },
+      "zones": [
+        {"x_min": 0.0, "x_max": 0.3, "y_min": 0.5, "y_max": 1.0, "action": "left_stick", "binding": "", "sensitivity": 1.0, "deadzone": 0.1},
+        {"x_min": 0.75, "x_max": 0.875, "y_min": 0.55, "y_max": 0.7, "action": "tap", "binding": "KEY_J", "sensitivity": 1.0, "deadzone": 0.0},
+        {"x_min": 0.875, "x_max": 1.0, "y_min": 0.55, "y_max": 0.7, "action": "tap", "binding": "KEY_K", "sensitivity": 1.0, "deadzone": 0.0},
+        {"x_min": 0.75, "x_max": 0.875, "y_min": 0.7, "y_max": 0.85, "action": "tap", "binding": "KEY_L", "sensitivity": 1.0, "deadzone": 0.0},
+        {"x_min": 0.875, "x_max": 1.0, "y_min": 0.7, "y_max": 0.85, "action": "tap", "binding": "KEY_SEMICOLON", "sensitivity": 1.0, "deadzone": 0.0},
+        {"x_min": 0.75, "x_max": 1.0, "y_min": 0.85, "y_max": 1.0, "action": "tap", "binding": "KEY_E", "sensitivity": 1.0, "deadzone": 0.0},
+        {"x_min": 0.5, "x_max": 0.65, "y_min": 0.85, "y_max": 1.0, "action": "tap", "binding": "KEY_SPACE", "sensitivity": 1.0, "deadzone": 0.0},
+        {"x_min": 0.35, "x_max": 0.5, "y_min": 0.85, "y_max": 1.0, "action": "tap", "binding": "KEY_TAB", "sensitivity": 1.0, "deadzone": 0.0},
+        {"x_min": 0.0, "x_max": 0.15, "y_min": 0.0, "y_max": 0.15, "action": "tap", "binding": "KEY_Q", "sensitivity": 1.0, "deadzone": 0.0}
+      ],
+      "key_bindings": {
+        "KEY_W": "move_up",
+        "KEY_S": "move_down",
+        "KEY_A": "move_left",
+        "KEY_D": "move_right",
+        "KEY_J": "attack",
+        "KEY_K": "magic",
+        "KEY_L": "defend",
+        "KEY_SEMICOLON": "special",
+        "KEY_E": "interact",
+        "KEY_SPACE": "confirm",
+        "KEY_TAB": "menu",
+        "KEY_Q": "map"
+      }
+    }
+  }
+}

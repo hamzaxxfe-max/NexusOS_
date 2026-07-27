@@ -1,0 +1,47 @@
+[Unit]
+Description=NexusOS Key Mapper Daemon
+Documentation=https://docs.nexusos.dev/key-mapper
+After=waydroid-session.service
+Requires=waydroid-session.service
+After=graph-session.target
+Wants=graph-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/nexusos/android/key-mapper/key-mapper-daemon.py
+ExecStartPre=/bin/sleep 3
+ExecStop=/bin/kill -SIGTERM $MAINPID
+Restart=always
+RestartSec=5
+TimeoutStartSec=30
+TimeoutStopSec=10
+
+User=root
+Group=root
+
+Environment=PYTHONUNBUFFERED=1
+Environment=DISPLAY=:0
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment=XDG_RUNTIME_DIR=/run/user/0
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=nexusos-key-mapper
+
+# Security hardening
+ProtectSystem=false
+ProtectHome=false
+ReadWritePaths=/var/log/nexusos /etc/nexusos /root/.config/nexusos
+PrivateTmp=true
+NoNewPrivileges=false
+CapabilityBoundingSet=CAP_SYS_ADMIN CAP_NET_ADMIN CAP_MKNOD CAP_SYS_RAWIO CAP_DAC_OVERRIDE
+
+# Resource limits
+MemoryMax=256M
+CPUQuota=50%
+Nice=5
+IOSchedulingClass=best-effort
+IOSchedulingPriority=4
+
+[Install]
+WantedBy=multi-user.target

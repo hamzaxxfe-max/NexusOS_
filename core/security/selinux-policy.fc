@@ -1,0 +1,32 @@
+/opt/nexusos/games(/.*)?                  gen_context(system_u:object_r:nexusos_game_exec_t,s0)
+/opt/nexusos/games/[^/]*\.save(/.*)?       gen_context(system_u:object_r:nexusos_game_save_t,s0)
+/opt/nexusos/games/saves(/.*)?             gen_context(system_u:object_r:nexusos_game_save_t,s0)
+/opt/nexusos/games/data(/.*)?              gen_context(system_u:object_r:nexusos_game_data_t,s0)
+/opt/nexusos/games/config(/.*)?            gen_context(system_u:object_r:nexusos_config_t,s0)
+
+/usr/lib/nexusos/sandbox(/.*)?             gen_context(system_u:object_r:nexusos_bypass_exec_t,s0)
+/usr/lib/nexusos/daemon(/.*)?              gen_context(system_u:object_r:nexusos_daemon_exec_t,s0)
+/usr/lib/nexusos/udev-helper(/.*)?         gen_context(system_u:object_r:nexusos_udev_exec_t,s0)
+
+/var/lib/waydroid(/.*)?                     gen_context(system_u:object_r:nexusos_untrusted_app_t,s0)
+/var/lib/waydroid/images(/.*)?             gen_context(system_u:object_r:nexusos_untrusted_app_t,s0)
+/var/lib/waydroid/data(/.*)?               gen_context(system_u:object_r:nexusos_android_data_t,s0)
+
+/etc/nexusos(/.*)?                         gen_context(system_u:object_r:nexusos_config_t,s0)
+/etc/nexusos/config\.json                  gen_context(system_u:object_r:nexusos_config_t,s0)
+/etc/nexusos/input-mapping\.json           gen_context(system_u:object_r:nexusos_config_t,s0)
+/etc/nexusos/security\.json                gen_context(system_u:object_r:nexusos_config_t,s0)
+/etc/nexusos/selinux-policy\.te            gen_context(system_u:object_r:nexusos_config_t,s0)
+
+/home/[^/]+/Android[ ]Files(/.*)?          gen_context(system_u:object_r:nexusos_android_data_t,s0)
+/home/[^/]+/nexusos(/.*)?                  gen_context(system_u:object_r:nexusos_game_data_t,s0)
+/home/[^/]+/\.nexusos(/.*)?               gen_context(system_u:object_r:nexusos_game_data_t,s0)
+/home/[^/]+/\.local/share/nexusos(/.*)?    gen_context(system_u:object_r:nexusos_game_data_t,s0)
+
+/var/log/nexusos(/.*)?                     gen_context(system_u:object_r:var_log_t,s0)
+/var/lib/nexusos(/.*)?                     gen_context(system_u:object_r:var_lib_t,s0)
+
+/run/nexusos(/.*)?                         gen_context(system_u:object_r:nexusos_tmp_t,s0)
+/run/nexusos/bypass\.sock                  gen_context(system_u:object_r:nexusos_tmp_t,s0)
+
+/tmp/nexusos(/.*)?                         gen_context(system_u:object_r:nexusos_tmp_t,s0)

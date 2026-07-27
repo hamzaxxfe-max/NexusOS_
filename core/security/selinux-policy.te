@@ -1,0 +1,264 @@
+policy_module(nexusos, 1.0.0)
+
+require {
+    type userdomain;
+    type unconfined_domain;
+    type unconfined_t;
+    type init_t;
+    type initrc_t;
+    type kernel_t;
+    type system_u;
+    type object_r;
+    role system_r;
+    role unconfined_r;
+    class file { read open getattr execute execute_no_trans map create write unlink };
+    class dir { search read getattr open };
+    class chr_file { read write open getattr ioctl };
+    class sock_file { read write create unlink };
+    class unix_stream_socket { connectto read write };
+    class process { signal sigchld setexec setpgid };
+    class capability { sys_admin net_admin sys_ptrace dac_override };
+    class netlink_kobject_uevent_socket { create bind read write };
+    class association { create destroy };
+    class tcp_socket { create bind listen accept connectto read write };
+    class udp_socket { create bind read write };
+    class rawip_socket { create bind read write };
+    class packet_socket { create bind };
+    class node { tcp_recv tcp_send udp_recv udp_send };
+}
+
+attribute nexusos_domain;
+
+type nexusos_game_t;
+type nexusos_game_exec_t;
+type nexusos_game_data_t;
+type nexusos_game_save_t;
+type nexusos_bypass_t;
+type nexusos_bypass_exec_t;
+type nexusos_config_t;
+type nexusos_untrusted_app_t;
+type nexusos_untrusted_app_exec_t;
+type nexusos_android_data_t;
+type nexusos_daemon_t;
+type nexusos_daemon_exec_t;
+type nexusos_input_device_t;
+
+role nexusos_game_r types nexusos_game_t;
+role nexusos_game_r types nexusos_game_data_t;
+role nexusos_game_r types nexusos_game_save_t;
+role nexusos_bypass_r types nexusos_bypass_t;
+role nexusos_untrusted_r types nexusos_untrusted_app_t;
+role nexusos_daemon_r types nexusos_daemon_t;
+
+role system_r types nexusos_daemon_t;
+role system_r types nexusos_bypass_t;
+
+type nexusos_home_t;
+type nexusos_tmp_t;
+type nexusos_gpu_device_t;
+type nexusos_audio_device_t;
+
+typeattribute nexusos_domain nexusos_game_t;
+typeattribute nexusos_domain nexusos_untrusted_app_t;
+
+init_domain(nexusos_daemon_t, nexusos_daemon_exec_t)
+init_domain(nexusos_bypass_t, nexusos_bypass_exec_t)
+
+domain_type(nexusos_game_t)
+domain_type(nexusos_untrusted_app_t)
+domain_type(nexusos_bypass_t)
+domain_type(nexusos_daemon_t)
+
+userdomain(nexusos_game_t, nexusos_game_r, system_u)
+userdomain(nexusos_untrusted_app_t, nexusos_untrusted_r, system_u)
+userdomain(nexusos_bypass_t, nexusos_bypass_r, system_u)
+
+typeattr nexusos_domain can_execmod;
+
+allow nexusos_game_t nexusos_game_exec_t:file { read open getattr execute execute_no_trans map };
+allow nexusos_game_t nexusos_game_exec_t:dir { search read getattr open };
+
+allow nexusos_game_t nexusos_game_data_t:dir { search read getattr open create write add_name remove_name };
+allow nexusos_game_t nexusos_game_data_t:file { read write create open getattr append unlink lock ioctl map };
+
+allow nexusos_game_t nexusos_game_save_t:dir { search read getattr open create write add_name remove_name };
+allow nexusos_game_t nexusos_game_save_t:file { read write create open getattr append unlink lock map };
+
+allow nexusos_game_t nexusos_home_t:dir { search read getattr open };
+allow nexusos_game_t nexusos_home_t:file { read open getattr map };
+
+allow nexusos_game_t nexusos_tmp_t:dir { search read getattr open create write add_name remove_name };
+allow nexusos_game_t nexusos_tmp_t:file { read write create open getattr append unlink lock map };
+allow nexusos_game_t tmp_t:dir { search read getattr open create write add_name remove_name };
+allow nexusos_game_t tmp_t:file { read write create open getattr append unlink lock map };
+
+allow nexusos_game_t nexusos_gpu_device_t:chr_file { read write open getattr ioctl map };
+allow nexusos_game_t device_t:chr_file { read write open getattr ioctl map };
+allow nexusos_game_t dri_device_t:chr_file { read write open getattr ioctl map };
+
+allow nexusos_game_t nexusos_audio_device_t:chr_file { read write open getattr ioctl };
+allow nexusos_game_t sound_device_t:chr_file { read write open getattr ioctl };
+
+neverallow nexusos_game_t etc_t:dir { write add_name remove_name create unlink };
+neverallow nexusos_game_t etc_t:file { write create append unlink lock };
+neverallow nexusos_game_t usr_t:dir { write add_name remove_name create unlink };
+neverallow nexusos_game_t usr_t:file { write create append unlink lock };
+neverallow nexusos_game_t boot_t:dir { write add_name remove_name create unlink };
+neverallow nexusos_game_t boot_t:file { write create append unlink lock };
+
+allow nexusos_game_t nexusos_config_t:dir { search read getattr open };
+allow nexusos_game_t nexusos_config_t:file { read open getattr map };
+
+allow nexusos_game_t self:process { signal sigchld setpgid };
+allow nexusos_game_t self:capability { sys_admin };
+
+allow nexusos_game_t init_t:unix_stream_socket connectto;
+allow nexusos_game_t init_t:process signal;
+
+allow nexusos_game_t default_t:dir { search read getattr };
+allow nexusos_game_t default_t:file { read open getattr map };
+
+allow nexusos_game_t proc_t:dir { search read getattr };
+allow nexusos_game_t proc_t:file { read open getattr map };
+allow nexusos_game_t proc_net_t:file { read open getattr map };
+
+allow nexusos_game_t port_type:tcp_socket { create bind listen accept connectto read write };
+allow nexusos_game_t port_type:udp_socket { create bind read write };
+allow nexusos_game_t node_t:node { tcp_recv tcp_send udp_recv udp_send };
+allow nexusos_game_t netif_t:netif { tcp_recv tcp_send udp_recv udp_send };
+
+allow nexusos_bypass_t nexusos_bypass_exec_t:file { read open getattr execute execute_no_trans map };
+allow nexusos_bypass_t nexusos_bypass_exec_t:dir { search read getattr open };
+
+allow nexusos_bypass_t nexusos_game_exec_t:file { read open getattr execute execute_no_trans map };
+allow nexusos_bypass_t nexusos_game_exec_t:dir { search read getattr open };
+
+allow nexusos_bypass_t nexusos_home_t:dir { search read getattr open };
+allow nexusos_bypass_t nexusos_home_t:file { read write create open getattr append unlink lock map };
+
+allow nexusos_bypass_t nexusos_tmp_t:dir { search read getattr open create write add_name remove_name };
+allow nexusos_bypass_t nexusos_tmp_t:file { read write create open getattr append unlink lock map };
+allow nexusos_bypass_t tmp_t:dir { search read getattr open create write add_name remove_name };
+allow nexusos_bypass_t tmp_t:file { read write create open getattr append unlink lock map };
+
+allow nexusos_bypass_t nexusos_gpu_device_t:chr_file { read write open getattr ioctl map };
+allow nexusos_bypass_t device_t:chr_file { read write open getattr ioctl map };
+allow nexusos_bypass_t dri_device_t:chr_file { read write open getattr ioctl map };
+
+allow nexusos_bypass_t nexusos_audio_device_t:chr_file { read write open getattr ioctl };
+allow nexusos_bypass_t sound_device_t:chr_file { read write open getattr ioctl };
+
+allow nexusos_bypass_t nexusos_config_t:dir { search read getattr open };
+allow nexusos_bypass_t nexusos_config_t:file { read open getattr map };
+
+allow nexusos_bypass_t nexusos_daemon_t:unix_stream_socket connectto;
+allow nexusos_bypass_t nexusos_daemon_t:process signal;
+
+allow nexusos_bypass_t self:capability { sys_admin net_admin };
+allow nexusos_bypass_t self:process { signal sigchld setexec setpgid };
+allow nexusos_bypass_t self:capability dac_override;
+
+allow nexusos_bypass_t proc_t:dir { search read getattr };
+allow nexusos_bypass_t proc_t:file { read open getattr map };
+
+allow nexusos_untrusted_app_t nexusos_untrusted_app_exec_t:file { read open getattr execute execute_no_trans map };
+allow nexusos_untrusted_app_t nexusos_untrusted_app_exec_t:dir { search read getattr open };
+
+allow nexusos_untrusted_app_t nexusos_android_data_t:dir { search read getattr open create write add_name remove_name };
+allow nexusos_untrusted_app_t nexusos_android_data_t:file { read write create open getattr append unlink lock map };
+
+allow nexusos_untrusted_app_t nexusos_home_t:dir { search read getattr open };
+allow nexusos_untrusted_app_t nexusos_home_t:file { read open getattr map };
+
+allow nexusos_untrusted_app_t nexusos_tmp_t:dir { search read getattr open create write add_name remove_name };
+allow nexusos_untrusted_app_t nexusos_tmp_t:file { read write create open getattr append unlink lock map };
+allow nexusos_untrusted_app_t tmp_t:dir { search read getattr open create write add_name remove_name };
+allow nexusos_untrusted_app_t tmp_t:file { read write create open getattr append unlink lock map };
+
+allow nexusos_untrusted_app_t nexusos_gpu_device_t:chr_file { read write open getattr ioctl map };
+allow nexusos_untrusted_app_t device_t:chr_file { read write open getattr ioctl map };
+allow nexusos_untrusted_app_t dri_device_t:chr_file { read write open getattr ioctl map };
+
+allow nexusos_untrusted_app_t nexusos_audio_device_t:chr_file { read write open getattr ioctl };
+allow nexusos_untrusted_app_t sound_device_t:chr_file { read write open getattr ioctl };
+
+allow nexusos_untrusted_app_t nexusos_config_t:dir { search read getattr open };
+allow nexusos_untrusted_app_t nexusos_config_t:file { read open getattr map };
+
+allow nexusos_untrusted_app_t self:process { signal sigchld setpgid };
+allow nexusos_untrusted_app_t self:capability { net_admin };
+
+neverallow nexusos_untrusted_app_t etc_t:dir { write add_name remove_name create unlink };
+neverallow nexusos_untrusted_app_t etc_t:file { write create append unlink lock };
+neverallow nexusos_untrusted_app_t usr_t:dir { write add_name remove_name create unlink };
+neverallow nexusos_untrusted_app_t usr_t:file { write create append unlink lock };
+neverallow nexusos_untrusted_app_t boot_t:dir { write add_name remove_name create unlink };
+neverallow nexusos_untrusted_app_t boot_t:file { write create append unlink lock };
+neverallow nexusos_untrusted_app_t var_lib_t:dir { write add_name remove_name create unlink };
+neverallow nexusos_untrusted_app_t var_lib_t:file { write create append unlink lock };
+
+allow nexusos_daemon_t nexusos_daemon_exec_t:file { read open getattr execute execute_no_trans map };
+allow nexusos_daemon_t nexusos_daemon_exec_t:dir { search read getattr open };
+
+allow nexusos_daemon_t nexusos_config_t:dir { search read getattr open create write add_name remove_name };
+allow nexusos_daemon_t nexusos_config_t:file { read write create open getattr append unlink };
+
+allow nexusos_daemon_t nexusos_game_t:process { signal sigchld };
+allow nexusos_daemon_t nexusos_game_t:dir { search read getattr open };
+allow nexusos_daemon_t nexusos_game_t:file { read open getattr };
+
+allow nexusos_daemon_t nexusos_bypass_t:process { signal sigchld };
+allow nexusos_daemon_t nexusos_bypass_t:unix_stream_socket { connectto read write };
+
+allow nexusos_daemon_t nexusos_untrusted_app_t:process { signal sigchld };
+allow nexusos_daemon_t nexusos_untrusted_app_t:dir { search read getattr open };
+allow nexusos_daemon_t nexusos_untrusted_app_t:file { read open getattr };
+
+allow nexusos_daemon_t nexusos_input_device_t:chr_file { read write open getattr ioctl };
+
+allow nexusos_daemon_t nexusos_tmp_t:dir { search read getattr open create write add_name remove_name };
+allow nexusos_daemon_t nexusos_tmp_t:file { read write create open getattr append unlink lock map };
+allow nexusos_daemon_t tmp_t:dir { search read getattr open create write add_name remove_name };
+allow nexusos_daemon_t tmp_t:file { read write create open getattr append unlink lock map };
+
+allow nexusos_daemon_t nexusos_home_t:dir { search read getattr open };
+allow nexusos_daemon_t nexusos_home_t:file { read write create open getattr append unlink lock map };
+
+allow nexusos_daemon_t proc_t:dir { search read getattr };
+allow nexusos_daemon_t proc_t:file { read open getattr map };
+
+allow nexusos_daemon_t self:capability { sys_admin net_admin sys_ptrace dac_override };
+allow nexusos_daemon_t self:process { signal sigchld setexec setpgid };
+
+allow nexusos_daemon_t init_t:unix_stream_socket connectto;
+allow nexusos_daemon_t init_t:process signal;
+
+allow nexusos_daemon_t port_type:tcp_socket { create bind listen accept connectto read write };
+allow nexusos_daemon_t port_type:udp_socket { create bind read write };
+allow nexusos_daemon_t node_t:node { tcp_recv tcp_send udp_recv udp_send };
+
+allow nexusos_daemon_t nexusos_game_save_t:dir { search read getattr open create write add_name remove_name };
+allow nexusos_daemon_t nexusos_game_save_t:file { read write create open getattr append unlink lock map };
+
+allow nexusos_daemon_t nexusos_game_data_t:dir { search read getattr open create write add_name remove_name };
+allow nexusos_daemon_t nexusos_game_data_t:file { read write create open getattr append unlink lock map };
+
+allow nexusos_daemon_t nexusos_android_data_t:dir { search read getattr open create write add_name remove_name };
+allow nexusos_daemon_t nexusos_android_data_t:file { read write create open getattr append unlink lock map };
+
+allow nexusos_daemon_t kernel_t:system module_request;
+
+allow nexusos_bypass_t var_log_t:dir { search read getattr open create write add_name };
+allow nexusos_bypass_t var_log_t:file { read write create open getattr append lock };
+allow nexusos_bypass_t nexusos_tmp_t:file { read write create open getattr append lock };
+
+type nexusos_udev_t;
+type nexusos_udev_exec_t;
+role system_r types nexusos_udev_t;
+init_daemon_domain(nexusos_udev_t, nexusos_udev_exec_t)
+
+allow nexusos_udev_t nexusos_input_device_t:chr_file { read write open getattr ioctl };
+allow nexusos_udev_t device_t:chr_file { read write open getattr ioctl };
+allow nexusos_udev_t self:capability { sys_admin net_admin dac_override };
+
+allow nexusos_daemon_t nexusos_udev_t:unix_stream_socket connectto;

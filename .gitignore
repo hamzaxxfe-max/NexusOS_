@@ -1,0 +1,14 @@
+build/
+*.iso
+*.iso.xz
+__pycache__/
+*.pyc
+*.pyo
+.env
+.env.local
+*.log
+.tmp/
+node_modules/
+dist/
+*.deb
+*.rpm

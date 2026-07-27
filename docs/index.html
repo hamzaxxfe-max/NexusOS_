@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NexusOS — Immutable Gaming OS. Zero Compromises.</title>
+<meta name="description" content="NexusOS is an immutable, gaming-first operating system built on Btrfs snapshots, advanced sandboxing, and native gamepad support. Zero compromises.">
+<meta name="keywords" content="NexusOS, immutable OS, gaming Linux, Btrfs, SELinux, Waydroid, Linux gaming">
+<meta property="og:title" content="NexusOS — Immutable Gaming OS">
+<meta property="og:description" content="Zero compromises. Immutable architecture, advanced security, native gamepad input, and Android integration.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://nexusos.dev">
+<meta property="og:image" content="https://nexusos.dev/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="NexusOS — Immutable Gaming OS">
+<meta name="twitter:description" content="Zero compromises. Immutable architecture, advanced security, native gamepad input, and Android integration.">
+<meta name="theme-color" content="#00D2FF">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #121212;
+  --panel: #1A2238;
+  --panel-hover: #212c4a;
+  --cyan: #00D2FF;
+  --cyan-dim: #00a8cc;
+  --cyan-glow: rgba(0, 210, 255, 0.15);
+  --text: #e4e8f1;
+  --text-dim: #8892a4;
+  --border: #2a3454;
+  --surface: #161e30;
+  --radius: 12px;
+  --font: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+html { scroll-behavior: smooth; background: var(--bg); color: var(--text); font-family: var(--font); }
+
+body {
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--cyan); text-decoration: none; transition: color .2s; }
+a:hover { color: #fff; }
+
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 clamp(1rem, 4vw, 3rem);
+  height: 64px;
+  background: rgba(18, 18, 18, 0.85);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+}
+nav .logo { font-weight: 800; font-size: 1.25rem; color: var(--cyan); letter-spacing: -0.5px; }
+nav .links { display: flex; gap: 1.75rem; }
+nav .links a {
+  color: var(--text-dim); font-size: 0.875rem; font-weight: 500;
+  transition: color .2s;
+}
+nav .links a:hover { color: var(--cyan); }
+.nav-toggle { display: none; background: none; border: none; color: var(--text); font-size: 1.5rem; cursor: pointer; }
+
+section { padding: clamp(3rem, 8vw, 6rem) clamp(1rem, 4vw, 3rem); max-width: 1200px; margin: 0 auto; }
+
+/* ── Hero ────────────────────────────────────── */
+.hero {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; min-height: 100vh; padding-top: 64px;
+  position: relative;
+}
+.hero::before {
+  content: '';
+  position: absolute; top: 15%; left: 50%; transform: translateX(-50%);
+  width: 600px; height: 600px; border-radius: 50%;
+  background: radial-gradient(circle, var(--cyan-glow) 0%, transparent 70%);
+  pointer-events: none;
+  animation: pulse 4s ease-in-out infinite alternate;
+}
+@keyframes pulse {
+  0% { opacity: 0.5; transform: translateX(-50%) scale(1); }
+  100% { opacity: 1; transform: translateX(-50%) scale(1.15); }
+}
+.hero h1 {
+  font-size: clamp(3rem, 10vw, 7rem); font-weight: 900; letter-spacing: -3px;
+  background: linear-gradient(135deg, #fff 30%, var(--cyan) 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+  position: relative; z-index: 1;
+  text-shadow: 0 0 80px rgba(0, 210, 255, 0.3);
+}
+.hero .tagline {
+  font-size: clamp(1.1rem, 2.5vw, 1.5rem); color: var(--text-dim);
+  margin-top: 1rem; font-weight: 500; z-index: 1;
+}
+.cta-btn {
+  margin-top: 2.5rem; display: inline-flex; align-items: center; gap: 0.5rem;
+  padding: 0.9rem 2.2rem; border-radius: 50px;
+  background: var(--cyan); color: #0d0d0d; font-weight: 700; font-size: 1rem;
+  transition: transform .2s, box-shadow .2s;
+  z-index: 1;
+}
+.cta-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 210, 255, 0.4);
+  color: #0d0d0d;
+}
+.scroll-hint {
+  position: absolute; bottom: 2rem; z-index: 1;
+  color: var(--text-dim); font-size: 0.8rem;
+  animation: bob 2s ease-in-out infinite;
+}
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(6px); }
+}
+
+/* ── Section headings ────────────────────────── */
+.section-title {
+  font-size: clamp(1.75rem, 4vw, 2.5rem); font-weight: 800;
+  letter-spacing: -1px; margin-bottom: 0.5rem;
+}
+.section-sub { color: var(--text-dim); font-size: 1rem; margin-bottom: 3rem; }
+
+/* ── Features Grid ───────────────────────────── */
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+.feature-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2rem;
+  transition: transform .3s, border-color .3s, box-shadow .3s;
+  opacity: 0;
+  transform: translateY(30px);
+}
+.feature-card.visible {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity .5s ease, transform .5s ease, border-color .3s, box-shadow .3s;
+}
+.feature-card:hover {
+  border-color: var(--cyan);
+  box-shadow: 0 0 30px var(--cyan-glow);
+  transform: translateY(-4px);
+}
+.feature-icon {
+  font-size: 2rem; margin-bottom: 1rem;
+  width: 52px; height: 52px; display: flex; align-items: center; justify-content: center;
+  background: var(--surface); border-radius: 10px;
+  border: 1px solid var(--border);
+}
+.feature-card h3 { font-size: 1.15rem; font-weight: 700; margin-bottom: 0.5rem; }
+.feature-card p { color: var(--text-dim); font-size: 0.9rem; line-height: 1.6; }
+
+/* ── Specs ───────────────────────────────────── */
+.specs-table {
+  width: 100%; border-collapse: collapse;
+  background: var(--panel); border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.specs-table th, .specs-table td {
+  padding: 1rem 1.5rem; text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.specs-table th {
+  background: var(--surface); font-weight: 600; font-size: 0.85rem;
+  color: var(--cyan); text-transform: uppercase; letter-spacing: 1px;
+}
+.specs-table tr:last-child td { border-bottom: none; }
+.specs-table td:first-child { font-weight: 600; }
+.specs-table td { color: var(--text-dim); }
+
+/* ── Screenshot ──────────────────────────────── */
+.screenshot-placeholder {
+  width: 100%; aspect-ratio: 16/9; max-height: 520px;
+  background: var(--panel);
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 0.75rem;
+  color: var(--text-dim);
+}
+.screenshot-placeholder .icon { font-size: 3rem; opacity: 0.5; }
+
+/* ── Downloads ───────────────────────────────── */
+.downloads-table {
+  width: 100%; border-collapse: collapse;
+  background: var(--panel); border-radius: var(--radius);
+  overflow: hidden; border: 1px solid var(--border);
+}
+.downloads-table th, .downloads-table td {
+  padding: 1rem 1.5rem; text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.downloads-table th {
+  background: var(--surface); font-weight: 600; font-size: 0.85rem;
+  color: var(--cyan); text-transform: uppercase; letter-spacing: 1px;
+}
+.downloads-table tr:last-child td { border-bottom: none; }
+.downloads-table td { color: var(--text-dim); }
+.badge {
+  display: inline-block; padding: 0.2rem 0.6rem;
+  border-radius: 50px; font-size: 0.75rem; font-weight: 600;
+}
+.badge-latest { background: rgba(0, 210, 255, 0.15); color: var(--cyan); }
+.badge-stable { background: rgba(76, 175, 80, 0.15); color: #66BB6A; }
+.badge-archived { background: rgba(158, 158, 158, 0.15); color: #9e9e9e; }
+
+/* ── Footer ──────────────────────────────────── */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 3rem clamp(1rem, 4vw, 3rem);
+  text-align: center; color: var(--text-dim); font-size: 0.85rem;
+}
+footer .footer-links { display: flex; justify-content: center; gap: 2rem; margin-bottom: 1rem; flex-wrap: wrap; }
+footer .footer-links a { color: var(--text-dim); }
+footer .footer-links a:hover { color: var(--cyan); }
+footer .copy { margin-top: 0.5rem; }
+
+/* ── Responsive ──────────────────────────────── */
+@media (max-width: 768px) {
+  nav .links { display: none; }
+  nav .links.open {
+    display: flex; flex-direction: column; position: absolute;
+    top: 64px; left: 0; right: 0;
+    background: rgba(18, 18, 18, 0.95);
+    backdrop-filter: blur(16px);
+    padding: 1.5rem;
+    gap: 1.25rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-toggle { display: block; }
+  .features-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 480px) {
+  .specs-table th, .specs-table td,
+  .downloads-table th, .downloads-table td { padding: 0.75rem 1rem; font-size: 0.85rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── Navigation ──────────────────────────── -->
+<nav>
+  <span class="logo">NexusOS</span>
+  <div class="links" id="navLinks">
+    <a href="#features">Features</a>
+    <a href="#specs">Specs</a>
+    <a href="#screenshots">Screenshots</a>
+    <a href="#download">Download</a>
+  </div>
+  <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">☰</button>
+</nav>
+
+<!-- ── Hero ────────────────────────────────── -->
+<section class="hero" id="top">
+  <h1>NexusOS</h1>
+  <p class="tagline">Immutable Gaming OS. Zero Compromises.</p>
+  <a class="cta-btn" href="https://github.com/NexusOS/nexusos/releases/latest" target="_blank" rel="noopener">
+    ⬇ Download v1.0.0
+  </a>
+  <span class="scroll-hint">↓ Scroll to explore</span>
+</section>
+
+<!-- ── Features ────────────────────────────── -->
+<section id="features">
+  <h2 class="section-title">Built for Gamers. Secured by Design.</h2>
+  <p class="section-sub">Every layer engineered for performance, security, and reliability.</p>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">🔒</div>
+      <h3>Immutable Architecture</h3>
+      <p>Read-only root filesystem powered by Btrfs snapshots. Every update is atomic — roll back instantly if anything breaks. Your system state is always recoverable.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🛡️</div>
+      <h3>Advanced Security</h3>
+      <p>SELinux mandatory access control combined with Bubblewrap sandboxing. Apps run in isolated namespaces with minimal privileges. Attack surface reduced to near zero.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🎮</div>
+      <h3>Unified Input Engine</h3>
+      <p>Native gamepad support across the entire desktop environment. No extra drivers, no Steam overlay hacks. Every application sees your controller natively.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📱</div>
+      <h3>Android Integration</h3>
+      <p>Run Android apps via Waydroid with full GPU acceleration. Built-in APK installer, seamless clipboard sharing, and shared file system between Linux and Android layers.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">⚡</div>
+      <h3>Performance Engine</h3>
+      <p>ZRAM compression for expanded effective memory. cgroups v2 throttler isolates background processes from gaming workloads. Every CPU cycle goes where you need it.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🔄</div>
+      <h3>Auto OTA Updates</h3>
+      <p>Incremental delta patches delivered automatically. Full rollback support if an update causes issues. Your games, saves, and configs stay untouched across every update.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Specs ───────────────────────────────── -->
+<section id="specs">
+  <h2 class="section-title">System Requirements</h2>
+  <p class="section-sub">Minimum hardware to run NexusOS at its best.</p>
+  <table class="specs-table">
+    <thead>
+      <tr><th>Component</th><th>Minimum Requirement</th><th>Recommended</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Processor</td><td>Intel Core i3 / AMD Ryzen 3</td><td>Intel Core i5 / AMD Ryzen 5 or higher</td></tr>
+      <tr><td>Memory</td><td>8 GB RAM</td><td>16 GB RAM</td></tr>
+      <tr><td>Storage</td><td>1 TB HDD (Btrfs)</td><td>1 TB NVMe SSD (Btrfs)</td></tr>
+      <tr><td>Graphics</td><td>Integrated GPU (OpenGL 4.5+)</td><td>Dedicated GPU (NVIDIA / AMD)</td></tr>
+      <tr><td>Network</td><td>Ethernet or Wi-Fi 5</td><td>Wi-Fi 6 / Gigabit Ethernet</td></tr>
+      <tr><td>Display</td><td>1280×720</td><td>1920×1080 or higher</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ── Screenshots ─────────────────────────── -->
+<section id="screenshots">
+  <h2 class="section-title">See NexusOS in Action</h2>
+  <p class="section-sub">Screenshots of the desktop, settings panel, and Android integration.</p>
+  <div class="screenshot-placeholder">
+    <span class="icon">🖥️</span>
+    <span style="font-weight: 600; font-size: 1.1rem;">Screenshot Coming Soon</span>
+    <span style="font-size: 0.85rem;">v1.0.0 desktop preview will be available after launch.</span>
+  </div>
+</section>
+
+<!-- ── Downloads ───────────────────────────── -->
+<section id="download">
+  <h2 class="section-title">Download NexusOS</h2>
+  <p class="section-sub">Choose your release channel. All images include full Btrfs snapshot support.</p>
+  <table class="downloads-table">
+    <thead>
+      <tr><th>Version</th><th>Release Date</th><th>Size</th><th>Status</th><th>Link</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>v1.0.0</td>
+        <td>July 2026</td>
+        <td>4.2 GB</td>
+        <td><span class="badge badge-latest">Latest</span></td>
+        <td><a href="https://github.com/NexusOS/nexusos/releases/tag/v1.0.0" target="_blank" rel="noopener">Download</a></td>
+      </tr>
+      <tr>
+        <td>v1.0.0-beta.3</td>
+        <td>June 2026</td>
+        <td>4.1 GB</td>
+        <td><span class="badge badge-archived">Archived</span></td>
+        <td><a href="https://github.com/NexusOS/nexusos/releases/tag/v1.0.0-beta.3" target="_blank" rel="noopener">Download</a></td>
+      </tr>
+      <tr>
+        <td>v1.0.0-beta.2</td>
+        <td>May 2026</td>
+        <td>4.0 GB</td>
+        <td><span class="badge badge-archived">Archived</span></td>
+        <td><a href="https://github.com/NexusOS/nexusos/releases/tag/v1.0.0-beta.2" target="_blank" rel="noopener">Download</a></td>
+      </tr>
+      <tr>
+        <td>v1.0.0-beta.1</td>
+        <td>April 2026</td>
+        <td>3.9 GB</td>
+        <td><span class="badge badge-archived">Archived</span></td>
+        <td><a href="https://github.com/NexusOS/nexusos/releases/tag/v1.0.0-beta.1" target="_blank" rel="noopener">Download</a></td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ── Footer ──────────────────────────────── -->
+<footer>
+  <div class="footer-links">
+    <a href="https://github.com/NexusOS/nexusos" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://github.com/NexusOS/nexusos/issues" target="_blank" rel="noopener">Issues</a>
+    <a href="https://github.com/NexusOS/nexusos/releases" target="_blank" rel="noopener">Releases</a>
+  </div>
+  <p class="copy">© 2026 NexusOS Technologies. All rights reserved. Proprietary Software.</p>
+</footer>
+
+<script>
+/* ── Mobile nav toggle ────────────────────── */
+document.getElementById('navToggle').addEventListener('click', function () {
+  document.getElementById('navLinks').classList.toggle('open');
+});
+
+/* ── Close mobile nav on link click ───────── */
+document.querySelectorAll('#navLinks a').forEach(function (link) {
+  link.addEventListener('click', function () {
+    document.getElementById('navLinks').classList.remove('open');
+  });
+});
+
+/* ── IntersectionObserver for feature cards ── */
+(function () {
+  var observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+
+  document.querySelectorAll('.feature-card').forEach(function (card, index) {
+    card.style.transitionDelay = (index * 0.08) + 's';
+    observer.observe(card);
+  });
+})();
+
+/* ── Active nav link highlight ─────────────── */
+(function () {
+  var sections = document.querySelectorAll('section[id]');
+  var navLinks = document.querySelectorAll('nav .links a');
+
+  function highlight() {
+    var scrollY = window.scrollY + 100;
+    sections.forEach(function (section) {
+      var top = section.offsetTop;
+      var height = section.offsetHeight;
+      var id = section.getAttribute('id');
+      if (scrollY >= top && scrollY < top + height) {
+        navLinks.forEach(function (link) {
+          link.style.color = '';
+          if (link.getAttribute('href') === '#' + id) {
+            link.style.color = '#00D2FF';
+          }
+        });
+      }
+    });
+  }
+
+  window.addEventListener('scroll', highlight, { passive: true });
+  highlight();
+})();
+</script>
+
+</body>
+</html>

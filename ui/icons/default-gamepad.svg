@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bodyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00D2FF" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#0099CC" stop-opacity="0.85"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <g filter="url(#glow)">
+    <!-- Main controller body -->
+    <path d="
+      M 128,180
+      Q 128,160 148,152
+      L 212,136
+      Q 240,128 256,128
+      Q 272,128 300,136
+      L 364,152
+      Q 384,160 384,180
+      L 396,220
+      Q 400,240 392,256
+      L 384,272
+      Q 376,288 360,300
+      L 340,316
+      Q 320,328 312,348
+      L 304,388
+      Q 300,408 280,416
+      L 260,420
+      Q 240,424 220,420
+      L 200,416
+      Q 180,408 176,388
+      L 168,348
+      C 168,328 164,316 148,304
+      L 128,288
+      Q 112,272 108,256
+      L 104,224
+      Q 100,200 128,180
+      Z
+    " fill="url(#bodyGrad)" stroke="#00D2FF" stroke-width="2" stroke-opacity="0.6"/>
+
+    <!-- D-pad -->
+    <rect x="152" y="216" width="16" height="48" rx="3" fill="#0E0E1A" opacity="0.7"/>
+    <rect x="140" y="228" width="40" height="16" rx="3" fill="#0E0E1A" opacity="0.7"/>
+
+    <!-- Right action buttons -->
+    <circle cx="344" cy="208" r="10" fill="none" stroke="#0E0E1A" stroke-width="2.5" opacity="0.7"/>
+    <circle cx="364" cy="228" r="10" fill="none" stroke="#0E0E1A" stroke-width="2.5" opacity="0.7"/>
+    <circle cx="344" cy="248" r="10" fill="none" stroke="#0E0E1A" stroke-width="2.5" opacity="0.7"/>
+    <circle cx="324" cy="228" r="10" fill="none" stroke="#0E0E1A" stroke-width="2.5" opacity="0.7"/>
+
+    <!-- Left analog stick -->
+    <circle cx="196" cy="296" r="18" fill="#0E0E1A" opacity="0.5"/>
+    <circle cx="196" cy="296" r="10" fill="#0E0E1A" opacity="0.3"/>
+
+    <!-- Right analog stick -->
+    <circle cx="316" cy="296" r="18" fill="#0E0E1A" opacity="0.5"/>
+    <circle cx="316" cy="296" r="10" fill="#0E0E1A" opacity="0.3"/>
+
+    <!-- Center buttons (Start/Select) -->
+    <ellipse cx="238" cy="252" rx="8" ry="5" fill="#0E0E1A" opacity="0.6"/>
+    <ellipse cx="274" cy="252" rx="8" ry="5" fill="#0E0E1A" opacity="0.6"/>
+
+    <!-- Top shoulder bumpers -->
+    <path d="M 148,168 Q 148,156 160,152 L 212,140 Q 220,138 220,146 L 220,156 Q 220,164 212,166 L 160,176 Q 148,178 148,168 Z"
+          fill="#0E0E1A" opacity="0.5"/>
+    <path d="M 364,168 Q 364,156 352,152 L 300,140 Q 292,138 292,146 L 292,156 Q 292,164 300,166 L 352,176 Q 364,178 364,168 Z"
+          fill="#0E0E1A" opacity="0.5"/>
+
+    <!-- Home / center power button -->
+    <circle cx="256" cy="224" r="7" fill="#0E0E1A" opacity="0.6"/>
+    <circle cx="256" cy="224" r="3" fill="#00D2FF" opacity="0.8"/>
+  </g>
+</svg>

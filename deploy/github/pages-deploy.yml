@@ -1,0 +1,102 @@
+name: Deploy NexusOS Website
+
+on:
+    push:
+        branches:
+            - main
+        paths:
+            - 'website/**'
+            - 'manifest.json'
+    workflow_dispatch:
+
+permissions:
+    contents: read
+    pages: write
+    id-token: write
+
+concurrency:
+    group: pages
+    cancel-in-progress: false
+
+jobs:
+    build:
+        name: Build Website
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '20'
+
+            - name: Install dependencies
+              run: |
+                  if [ -f website/package.json ]; then
+                      cd website && npm ci
+                  fi
+
+            - name: Build static assets
+              run: |
+                  if [ -f website/package.json ] && grep -q '"build"' website/package.json; then
+                      cd website && npm run build
+                  fi
+
+            - name: Process templates
+              run: |
+                  cp manifest.json website/manifest.json 2>/dev/null || true
+
+            - name: Minify HTML
+              run: |
+                  if command -v html-minifier &> /dev/null; then
+                      find website -name "*.html" -exec html-minifier \
+                          --collapse-whitespace \
+                          --remove-comments \
+                          --minify-css \
+                          --minify-js \
+                          -o {} {} \;
+                  fi
+
+            - name: Prepare Pages artifact
+              uses: actions/upload-pages-artifact@v3
+              with:
+                  path: website
+
+    deploy:
+        name: Deploy to Pages
+        needs: build
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+
+        environment:
+            name: github-pages
+            url: ${{ steps.deployment.outputs.page_url }}
+
+        steps:
+            - name: Deploy to GitHub Pages
+              id: deployment
+              uses: actions/deploy-pages@v4
+
+    verify:
+        name: Verify Deployment
+        needs: deploy
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+
+        steps:
+            - name: Wait for propagation
+              run: sleep 30
+
+            - name: Check site accessibility
+              run: |
+                  SITE_URL="https://${{ github.repository_owner }}.github.io/nexusos/"
+                  HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$SITE_URL" || echo "000")
+                  echo "HTTP status: $HTTP_STATUS"
+                  if [ "$HTTP_STATUS" = "200" ]; then
+                      echo "Site is live at $SITE_URL"
+                  else
+                      echo "Warning: Site returned HTTP $HTTP_STATUS. May need more propagation time."
+                  fi

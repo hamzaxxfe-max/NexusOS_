@@ -1,0 +1,70 @@
+[Unit]
+Description=NexusOS Security Bypass Daemon
+Documentation=https://nexusos.dev/docs/security-bypass
+After=graphical.target network.target
+Wants=graphical.target
+ConditionPathExists=/usr/lib/nexusos/daemon/security-bypass-daemon.py
+
+[Service]
+Type=dbus
+BusName=org.nexusos.SecurityBypass
+ExecStart=/usr/bin/python3 /usr/lib/nexusos/daemon/security-bypass-daemon.py
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=5
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+Environment=DISPLAY=:0
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONOPTIMIZE=1
+
+User=root
+Group=root
+UMask=0077
+
+ProtectSystem=strict
+ProtectHome=false
+ProtectProc=invisible
+ProtectControlGroups=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectClock=yes
+ProtectHostname=yes
+
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+
+MemoryDenyWriteExecute=yes
+LockPersonality=yes
+LockMemory=yes
+
+NoNewPrivileges=no
+PrivateDevices=no
+PrivateNetwork=no
+PrivateTmp=no
+PrivateUsers=no
+
+CapabilityBoundingSet=CAP_SYS_ADMIN CAP_NET_ADMIN CAP_DAC_OVERRIDE CAP_FOWNER CAP_CHOWN CAP_SETUID CAP_SETGID CAP_SYS_PTRACE
+AmbientCapabilities=CAP_SYS_ADMIN CAP_NET_ADMIN CAP_DAC_OVERRIDE CAP_FOWNER CAP_CHOWN CAP_SETUID CAP_SETGID CAP_SYS_PTRACE
+
+SystemCallArchitectures=native
+SystemCallFilter=~@clock @cpu-emulation @debug @module @mount @obsolete @reboot @swap @resources
+
+ReadWritePaths=/var/log/nexusos /run/nexusos /tmp/nexusos /etc/nexusos
+ReadOnlyPaths=/etc /usr /opt/nexusos
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=nexusos-security
+
+TimeoutStartSec=30
+TimeoutStopSec=15
+WatchdogSec=60
+
+[Install]
+WantedBy=graphical.target

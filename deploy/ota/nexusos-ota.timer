@@ -1,0 +1,12 @@
+[Unit]
+Description=NexusOS OTA Update Timer
+Documentation=https://nexusos.dev/docs/updates
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=6h
+Persistent=true
+RandomizedDelaySec=30min
+
+[Install]
+WantedBy=timers.target

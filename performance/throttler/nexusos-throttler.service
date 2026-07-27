@@ -1,0 +1,38 @@
+[Unit]
+Description=NexusOS Resource Throttler
+Documentation=https://nexusos.dev/docs/performance/throttler
+After=multi-user.target systemd-resolved.service
+Wants=systemd-resolved.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/nexusos/performance/throttler/resource-throttler.py
+ExecStartPre=/usr/bin/mkdir -p /sys/fs/cgroup/nexusos-gaming.slice
+ExecStartPre=/usr/bin/mkdir -p /sys/fs/cgroup/nexusos-install.slice
+ExecStop=/bin/kill -SIGTERM $MAINPID
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=nexusos-throttler
+
+User=root
+Group=root
+
+ProtectSystem=strict
+ReadWritePaths=/sys/fs/cgroup /var/log/nexusos /proc/sys/vm /etc/nexusos
+ProtectHome=read-only
+NoNewPrivileges=no
+CapabilityBoundingSet=CAP_SYS_ADMIN CAP_NET_RAW CAP_DAC_READ_SEARCH
+AmbientCapabilities=CAP_SYS_ADMIN CAP_NET_RAW CAP_DAC_READ_SEARCH
+
+CPUQuota=50%
+MemoryMax=256M
+MemoryHigh=128M
+
+Environment=PYTHONUNBUFFERED=1
+Environment=NEXUSOS_CONFIG=/etc/nexusos/config.json
+Environment=NEXUSOS_LOG=/var/log/nexusos/resource-throttler.log
+
+[Install]
+WantedBy=multi-user.target

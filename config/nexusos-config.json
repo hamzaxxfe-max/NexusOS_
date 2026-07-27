@@ -1,0 +1,111 @@
+{
+  "system": {
+    "name": "NexusOS",
+    "version": "1.0.0",
+    "hostname": "nexusos-gaming",
+    "immutable_enabled": true,
+    "selinux_mode": "enforcing",
+    "kernel": "linux-zen",
+    "language": "en-US",
+    "timezone": "UTC"
+  },
+  "security": {
+    "trusted_paths": [
+      "/usr/bin",
+      "/usr/lib",
+      "/opt/nexusos/bin",
+      "/opt/nexusos/games"
+    ],
+    "sandbox_enabled": true,
+    "sandbox_backend": "bubblewrap",
+    "bypass_log_path": "/var/log/nexusos/security-bypass.log",
+    "unsigned_app_policy": "prompt",
+    "selinux_policy_path": "/etc/selinux/nexusos/policy.te"
+  },
+  "input": {
+    "deadzone": 0.15,
+    "mouse_sensitivity": 1.0,
+    "mouse_acceleration": 1.2,
+    "gamepad_enabled": true,
+    "hotplug_detection": true,
+    "hotplug_interval_sec": 5,
+    "mapping_config_path": "/etc/nexusos/input-mapping.json",
+    "button_mappings_reference": {
+      "gamepad_mouse_x": "ABS_RX",
+      "gamepad_mouse_y": "ABS_RY",
+      "gamepad_scroll_up": "BTN_TL",
+      "gamepad_scroll_down": "BTN_TR",
+      "gamepad_left_click": "BTN_SOUTH",
+      "gamepad_right_click": "BTN_EAST",
+      "gamepad_wasd_x": "ABS_X",
+      "gamepad_wasd_y": "ABS_Y",
+      "gamepad_super": "BTN_START",
+      "gamepad_tab": "BTN_SELECT",
+      "gamepad_alt_tab": "BTN_TL2"
+    }
+  },
+  "performance": {
+    "zram_enabled": true,
+    "zram_size_mb": 8192,
+    "compression_algorithm": "zstd",
+    "compression_level": 3,
+    "max_ram_percent": 85,
+    "swappiness": 160,
+    "throttle_enabled": true,
+    "throttle_game_cpu_weight": 100,
+    "throttle_background_cpu_weight": 10,
+    "target_free_ram_gb": 7,
+    "decompression_cpu_weight_idle": 100,
+    "decompression_cpu_weight_gaming": 10
+  },
+  "display": {
+    "theme": "NexusOS-Dark",
+    "accent_color": "#00D2FF",
+    "background_color": "#121212",
+    "panel_color": "#1A2238",
+    "wallpaper_path": "/usr/share/nexusos/wallpapers/default.png",
+    "taskbar_position": "bottom",
+    "taskbar_height": 40,
+    "icon_size": 64,
+    "compositing_enabled": true,
+    "compositing_latency": 87,
+    "vsync": true
+  },
+  "android": {
+    "waydroid_enabled": true,
+    "waydroid_image": "VANILLA",
+    "shared_path": "/home/user/Android Files",
+    "obb_path": "/home/user/Android Files/obb",
+    "data_path": "/home/user/Android Files/data",
+    "keymapping_enabled": true,
+    "keymapping_config_path": "/etc/nexusos/keymaps.json",
+    "gpu_mode": "auto",
+    "auto_install_apk": true
+  },
+  "ota": {
+    "manifest_url": "https://raw.githubusercontent.com/username/nexusos/main/manifest.json",
+    "check_interval_hours": 6,
+    "auto_update_enabled": false,
+    "notify_on_update": true,
+    "rollback_enabled": true,
+    "max_rollback_snapshots": 3
+  },
+  "chrome": {
+    "default_browser": true,
+    "hardware_acceleration": true,
+    "gpu_rasterization": true,
+    "sandbox_tabs": true,
+    "disable_telemetry": true,
+    "disable_sync": false,
+    "flags": [
+      "--enable-gpu-rasterization",
+      "--enable-zero-copy",
+      "--ignore-gpu-blocklist",
+      "--enable-features=VaapiVideoDecoder",
+      "--disable-features=TranslateUI",
+      "--disable-background-networking",
+      "--disable-default-apps",
+      "--no-first-run"
+    ]
+  }
+}
