@@ -1,0 +1,17 @@
+[Unit]
+Description=NexusOS Tweak Hub
+After=graphical.target
+PartOf=nexusos-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/nexusos/games/tweak-hub/nexus-tweak-hub.py
+Restart=on-failure
+RestartSec=5
+Environment=DISPLAY=:0
+Environment=QT_QPA_PLATFORM=xcb
+Environment=XDG_RUNTIME_DIR=/run/user/%U
+WorkingDirectory=/opt/nexusos/games/tweak-hub
+
+[Install]
+WantedBy=nexusos-session.target

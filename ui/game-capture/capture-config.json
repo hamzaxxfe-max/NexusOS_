@@ -1,0 +1,12 @@
+{
+  "enabled": true,
+  "buffer_seconds": 30,
+  "fps": 60,
+  "resolution": "native",
+  "encoder": "vaapi",
+  "quality": "balanced",
+  "save_path": "~/Videos/NexusOS-Capture",
+  "trigger_combo": "Guide+RB",
+  "trigger_hold_ms": 2000,
+  "pause_wallpaper": true
+}

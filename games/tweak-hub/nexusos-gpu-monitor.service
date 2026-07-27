@@ -1,0 +1,18 @@
+[Unit]
+Description=NexusOS GPU Monitor Daemon
+After=graphical.target
+Wants=graphical.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/nexusos/games/tweak-hub/gpu-monitor-daemon.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+ProtectSystem=strict
+ReadWritePaths=/tmp/nexusos-gpu-stats.json /var/log/nexusos
+NoNewPrivileges=true
+
+[Install]
+WantedBy=graphical.target
