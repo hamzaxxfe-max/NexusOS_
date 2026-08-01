@@ -6,8 +6,18 @@ LOG_FILE="${LOG_DIR}/waydroid-init.log"
 WAYDROID_DATA="/var/lib/waydroid"
 ANDROID_FILES="$HOME/Android Files"
 WAYDROID_CFG="/etc/waydroid"
-USER_UID=$(id -u)
-USER_GID=$(id -g)
+# Real desktop user — must NOT be root's UID when invoked via sudo.
+if [[ -n "${SUDO_USER:-}" ]] && [[ "$SUDO_USER" != "root" ]]; then
+    REAL_USER="$SUDO_USER"
+else
+    REAL_USER="${USER:-$(logname 2>/dev/null || echo root)}"
+fi
+USER_UID=$(id -u "$REAL_USER" 2>/dev/null || echo 1000)
+USER_GID=$(id -g "$REAL_USER" 2>/dev/null || echo 1000)
+if [[ "$USER_UID" -eq 0 ]]; then
+    echo "ERROR: refusing to run Waydroid session as root" >&2
+    exit 1
+fi
 
 mkdir -p "$LOG_DIR"
 mkdir -p "$WAYDROID_CFG"

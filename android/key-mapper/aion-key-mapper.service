@@ -16,25 +16,44 @@ RestartSec=5
 TimeoutStartSec=30
 TimeoutStopSec=10
 
-User=root
-Group=root
+# Run as the real desktop user (via the per-user service if a graphical
+# session owns it), never as root. /dev/uinput needs the input group.
+User=aion-input
+Group=aion-input
+SupplementaryGroups=input
+UMask=0077
 
 Environment=PYTHONUNBUFFERED=1
 Environment=DISPLAY=:0
 Environment=WAYLAND_DISPLAY=wayland-0
-Environment=XDG_RUNTIME_DIR=/run/user/0
+Environment=XDG_RUNTIME_DIR=/run/aion-input
 
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=aion-key-mapper
 
-# Security hardening
-ProtectSystem=false
-ProtectHome=false
-ReadWritePaths=/var/log/aion /etc/aion /root/.config/aion
+# Security hardening — minimal privileges, zero network egress.
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectProc=invisible
+ProtectClock=true
+ProtectHostname=true
 PrivateTmp=true
-NoNewPrivileges=false
-CapabilityBoundingSet=CAP_SYS_ADMIN CAP_NET_ADMIN CAP_MKNOD CAP_SYS_RAWIO CAP_DAC_OVERRIDE
+PrivateDevices=no
+PrivateNetwork=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+NoNewPrivileges=true
+CapabilityBoundingSet=
+ReadWritePaths=/var/log/aion /var/lib/aion-input
+ReadOnlyPaths=/dev/uinput /dev/input/uinput
 
 # Resource limits
 MemoryMax=256M

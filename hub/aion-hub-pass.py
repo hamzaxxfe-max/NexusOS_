@@ -99,8 +99,8 @@ def main(argv: list | None = None) -> int:
         if password != confirm:
             print("Secrets do not match.", file=sys.stderr)
             return 1
-        if len(password) < 4:
-            print("Secret must be at least 4 characters.", file=sys.stderr)
+        if len(password) < 12:
+            print("Secret must be at least 12 characters.", file=sys.stderr)
             return 1
         set_password(password, target)
         print(f"Secret set in {target}")

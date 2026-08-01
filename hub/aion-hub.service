@@ -6,6 +6,8 @@ ConditionPathExists=/opt/aion/hub
 
 [Service]
 Type=simple
+User=aion-hub
+Group=aion-hub
 ExecStart=/usr/bin/python3 /opt/aion/hub/aion-hub-server.py --bind 127.0.0.1 --port 8931
 Restart=on-failure
 RestartSec=3
@@ -15,8 +17,16 @@ StandardError=journal
 SyslogIdentifier=aion-hub
 NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=false
-ProtectHome=false
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
 ReadWritePaths=/opt/aion/hub/installer /var/log/aion /opt/aion/games
 
 [Install]

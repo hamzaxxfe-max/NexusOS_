@@ -5,5 +5,10 @@ ACTION=="bind", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x030200
 ACTION=="unbind", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x030000", TEST=="power/control", ATTR{power/control}="on"
 ACTION=="unbind", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x030200", TEST=="power/control", ATTR{power/control}="on"
 
-# Thunderbolt auto-authorize for eGPU hotplug
-ACTION=="add", SUBSYSTEM=="thunderbolt", ATTR{authorized}=="0", ATTR{authorized}="1"
+# Thunderbolt eGPU: NO blanket auto-authorize. Thunderbolt devices are DMA
+# capable — auto-authorizing every plugged-in device lets a malicious
+# Thunderbolt accessory take over the machine. The Aion eGPU helper
+# (aion-egpu.service) authorizes devices via `boltctl authorize` only after
+# they are identified and approved by the user. Kernel default is
+# unauthorized (ATTR{authorized}=0); we intentionally add no rule that
+# flips it to 1.

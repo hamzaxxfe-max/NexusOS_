@@ -27,9 +27,12 @@ import importlib.util
 import json
 import logging
 import os
+import re
 import subprocess
 import threading
+import time
 import urllib.parse
+from collections import defaultdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -44,6 +47,59 @@ PASSWORD_FILE = Path(os.environ.get(
 DEFAULT_PORT = 8931
 
 logger = logging.getLogger("aion-hub")
+
+# --- Rate limiting ---------------------------------------------------------
+# Budget per client for sensitive endpoints (auth brute force, install spam).
+RATE_WINDOW = 60  # seconds
+RATE_BUDGET = {
+    "/api/auth/check": 5,   # 5 password guesses / minute
+    "/api/install": 10,     # 10 installs / minute
+}
+_rate_lock = threading.Lock()
+_rate_buckets: Dict[str, List[float]] = defaultdict(list)
+
+# Allowed local origins (host header / Origin header must be loopback).
+_ALLOWED_HOSTS = ("127.0.0.1", "localhost", "[::1]", "::1")
+
+
+def _allow_request(path: str, client: str) -> bool:
+    """Return True if `client` has budget left for `path` this window."""
+    bucket = None
+    for key, limit in RATE_BUDGET.items():
+        if path == key or path.startswith(key):
+            bucket = key
+            break
+    if bucket is None:
+        return True
+    with _rate_lock:
+        now = time.monotonic()
+        stamps = _rate_buckets[client]
+        stamps[:] = [t for t in stamps if now - t < RATE_WINDOW]
+        if len(stamps) >= RATE_BUDGET[bucket]:
+            return False
+        stamps.append(now)
+        return True
+
+
+def _local_peer(headers) -> bool:
+    """Reject cross-origin / DNS-rebinding requests: the Host header must
+    be a loopback name and (for POST) Origin must be a loopback URL."""
+    host = (headers.get("Host") or "").strip()
+    if not host:
+        return False
+    host_name = host.rsplit(":", 1)[0].strip("[]").lower()
+    if host_name not in _ALLOWED_HOSTS:
+        return False
+    origin = headers.get("Origin")
+    if origin:
+        try:
+            origin_host = urllib.parse.urlsplit(origin).netloc
+            origin_host = origin_host.rsplit(":", 1)[0].strip("[]").lower()
+        except ValueError:
+            return False
+        if origin_host not in _ALLOWED_HOSTS:
+            return False
+    return True
 
 
 def _password_enabled() -> bool:
@@ -308,6 +364,9 @@ class HubHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0].rstrip("/") or "/"
 
+        if not _local_peer(self.headers):
+            return self._send_json({"error": "forbidden"}, 403)
+
         if path == "/api/health":
             return self._send_json({"ok": True, "apps": self.catalog.count})
 
@@ -345,8 +404,18 @@ class HubHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = self.path.split("?", 1)[0]
+        try:
+            client = self.address_string()
+        except (AttributeError, OSError):
+            client = "127.0.0.1"
+
+        if not _local_peer(self.headers):
+            return self._send_json({"error": "forbidden"}, 403)
 
         if path == "/api/auth/check":
+            if not _allow_request(path, client):
+                return self._send_json({"error": "rate limited",
+                                        "retryAfter": RATE_WINDOW}, 429)
             body = self._read_body()
             try:
                 payload = json.loads(body or b"{}")
@@ -360,6 +429,9 @@ class HubHandler(BaseHTTPRequestHandler):
             }, 200 if ok else 401)
 
         if path.startswith("/api/install/"):
+            if not _allow_request("/api/install", client):
+                return self._send_json({"error": "rate limited",
+                                        "retryAfter": RATE_WINDOW}, 429)
             app_id = path[len("/api/install/"):]
             app = self.catalog.get(app_id)
             if app is None:

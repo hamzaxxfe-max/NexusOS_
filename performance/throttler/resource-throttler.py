@@ -248,8 +248,10 @@ class MemoryManager:
     def drop_caches(self) -> None:
         try:
             subprocess.run(["sync"], timeout=10, check=True)
-            Path("/proc/sys/vm/drop_caches").write_text("3")
-            logger.info("Dropped kernel caches")
+            # drop_caches=1 clears page cache only. Values 2/3 also drop
+            # dentries/inodes — unnecessary and disruptive during a session.
+            Path("/proc/sys/vm/drop_caches").write_text("1")
+            logger.info("Dropped kernel page cache")
         except (OSError, subprocess.TimeoutExpired, subprocess.CalledProcessError) as e:
             logger.warning("Failed to drop caches: %s", e)
 
@@ -291,6 +293,15 @@ class MemoryManager:
         candidates = []
         proc_path = Path("/proc")
         killable_names = {"firefox", "thunderbird", "libreoffice", "gimp", "blender"}
+        # Never kill: compositors/display servers, the game, or system daemons.
+        protected_names = {
+            "systemd", "kwin_x11", "kwin_wayland", "Hyprland", "sway",
+            "mutter", "gnome-shell", "plasmashell", "xorg", "Xorg", "Xwayland",
+            "wayfire", "river", "labwc", "weston",
+            "dbus-daemon", "polkitd", "systemd-journald", "systemd-logind",
+            "systemd-udevd", "systemd-resolved", "NetworkManager", "pacman",
+            "pipewire", "pipewire-pulse", "wireplumber", "pulseaudio",
+        }
 
         for entry in proc_path.iterdir():
             if not entry.name.isdigit():
@@ -298,14 +309,16 @@ class MemoryManager:
             try:
                 pid = int(entry.name)
                 comm = (entry / "comm").read_text().strip()
-                status = (entry / "status").read_text()
-                rss_kb = 0
-                for line in status.splitlines():
-                    if line.startswith("VmRSS:"):
-                        rss_kb = int(line.split()[1])
-                        break
-                rss_mb = rss_kb / 1024.0
-                if comm.lower() in killable_names or rss_mb > 500:
+                if comm in protected_names:
+                    continue
+                if comm in killable_names:
+                    status = (entry / "status").read_text()
+                    rss_kb = 0
+                    for line in status.splitlines():
+                        if line.startswith("VmRSS:"):
+                            rss_kb = int(line.split()[1])
+                            break
+                    rss_mb = rss_kb / 1024.0
                     candidates.append((pid, rss_mb, comm))
             except (OSError, ValueError):
                 continue

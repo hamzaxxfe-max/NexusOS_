@@ -184,7 +184,7 @@ class TestSecurity(unittest.TestCase):
         stub_self.path = "/api/frobnicate"
         stub_self.command = "POST"
         stub_self.request_version = "HTTP/1.1"
-        stub_self.headers = {}
+        stub_self.headers = {"Host": "127.0.0.1:8931"}
         stub_self.wfile = io.BytesIO()
         stub_self.server = NoServer()
         stub_self.connection = None
@@ -195,6 +195,58 @@ class TestSecurity(unittest.TestCase):
             original_do_post(stub_self)
             payload, status = send.call_args[0]
             self.assertEqual(status, 404)
+
+
+    def test_do_post_rejects_cross_origin_host(self):
+        """POST with a non-loopback Host header must be rejected (403).
+
+        Prevents DNS rebinding / cross-origin requests from reaching the
+        hub's privileged endpoints.
+        """
+        import io
+
+        stub_self = object.__new__(SERVER_MODULE.HubHandler)
+        stub_self.path = "/api/install/steam"
+        stub_self.command = "POST"
+        stub_self.request_version = "HTTP/1.1"
+        stub_self.headers = {"Host": "evil.example.com"}
+        stub_self.wfile = io.BytesIO()
+        stub_self.server = type("NoServer", (), {})()
+        stub_self.connection = None
+        stub_self.close_connection = True
+
+        with patch.object(SERVER_MODULE.HubHandler, "_send_json",
+                          wraps=lambda payload, status=200: (payload, status)) as send:
+            stub_self.do_POST()
+            payload, status = send.call_args[0]
+            self.assertEqual(status, 403)
+
+    def test_do_post_rate_limits_auth_check(self):
+        """Repeated /api/auth/check attempts from one client get 429."""
+        import io
+        from unittest.mock import patch as _patch
+
+        stub_self = object.__new__(SERVER_MODULE.HubHandler)
+        stub_self.command = "POST"
+        stub_self.request_version = "HTTP/1.1"
+        stub_self.headers = {"Host": "127.0.0.1", "Content-Length": "2"}
+        stub_self.rfile = io.BytesIO(b"{}")
+        stub_self.wfile = io.BytesIO()
+        stub_self.server = type("NoServer", (), {})()
+        stub_self.connection = None
+        stub_self.close_connection = True
+        stub_self.address_string = lambda: "1.2.3.4"
+
+        statuses = []
+        with _patch.object(SERVER_MODULE.HubHandler, "_send_json",
+                           wraps=lambda payload, status=200: status):
+            for _ in range(SERVER_MODULE.RATE_BUDGET["/api/auth/check"] + 1):
+                stub_self.path = "/api/auth/check"
+                stub_self.wfile = io.BytesIO()
+                stub_self.rfile = io.BytesIO(b"{}")
+                status = stub_self.do_POST()
+                statuses.append(status if status is not None else 200)
+        self.assertIn(429, statuses)
 
 
 def path_guard(handler_cls, path):

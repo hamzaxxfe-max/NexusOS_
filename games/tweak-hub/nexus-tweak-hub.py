@@ -123,8 +123,9 @@ QLabel#section-title { color: #c8c8d2; font-size: 10pt; font-weight: bold; }
 
 
 def run_cmd(cmd, timeout=10):
+    """Run a command as a token list (no shell) to prevent injection."""
     try:
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
         return r.stdout.strip(), r.returncode
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return "", 1
@@ -155,8 +156,15 @@ def detect_intel_gpu():
             card_name = os.path.basename(card)
             product = read_sysfs(f"{card}/device/product_name")
             if not product:
-                out, _ = run_cmd(f"lspci | grep -i 'VGA.*Intel' | head -1")
-                product = out if out else "Intel GPU (unknown model)"
+                try:
+                    r = subprocess.run(
+                        ["lspci"], capture_output=True, text=True, timeout=10)
+                    product = next(
+                        (ln for ln in r.stdout.splitlines()
+                         if "VGA" in ln and "Intel" in ln), "")
+                except (subprocess.TimeoutExpired, FileNotFoundError):
+                    product = ""
+                product = product or "Intel GPU (unknown model)"
             return {
                 "path": card,
                 "name": card_name,
@@ -516,8 +524,9 @@ class GpuTab(QWidget):
         )
         if reply == QMessageBox.StandardButton.Yes:
             out, rc = run_cmd(
-                "pkexec sh -c 'echo 0 > /sys/class/drm/card*/gt_max_freq_mhz 2>/dev/null; "
-                "echo 0 > /sys/class/drm/card*/gt_min_freq_mhz 2>/dev/null'"
+                ["pkexec", "sh", "-c",
+                 "echo 0 > /sys/class/drm/card*/gt_max_freq_mhz 2>/dev/null; "
+                 "echo 0 > /sys/class/drm/card*/gt_min_freq_mhz 2>/dev/null"]
             )
             self._load_frequencies()
             QMessageBox.information(self, "Restored", "GPU frequency management restored to defaults.")
@@ -550,8 +559,8 @@ class GpuTab(QWidget):
         gpu_mv = self.gpu_uv_spin.value()
         cache_mv = self.cache_uv_spin.value()
         out, rc = run_cmd(
-            f"pkexec intel-undervolt apply "
-            f"--cpu {cpu_mv} --gpu {gpu_mv} --cache {cache_mv}",
+            ["pkexec", "intel-undervolt", "apply",
+             "--cpu", str(cpu_mv), "--gpu", str(gpu_mv), "--cache", str(cache_mv)],
             timeout=15,
         )
         if rc == 0:
@@ -677,8 +686,8 @@ class StorageTab(QWidget):
         return {"widget": container, "bar": bar, "label": lbl}
 
     def _refresh_stats(self):
-        out, rc = run_cmd("btrfs filesystem show 2>/dev/null")
-        usage_out, _ = run_cmd("btrfs device usage / 2>/dev/null")
+        out, rc = run_cmd(["btrfs", "filesystem", "show"])
+        usage_out, _ = run_cmd(["btrfs", "device", "usage", "/"])
         if rc != 0:
             self.stats_text.setPlainText(
                 "Btrfs not available or / is not a Btrfs filesystem.\n"
@@ -732,7 +741,7 @@ class StorageTab(QWidget):
             if base.is_dir():
                 for entry in sorted(base.iterdir()):
                     if entry.is_dir():
-                        size_out, _ = run_cmd(f"du -sh '{entry}' 2>/dev/null")
+                        size_out, _ = run_cmd(["du", "-sh", str(entry)])
                         size_str = size_out.split("\t")[0] if size_out else "?"
                         self.game_dirs.append({
                             "path": str(entry),
@@ -764,7 +773,9 @@ class StorageTab(QWidget):
         self.status_lbl.setText(f"Compressing {Path(path).name}...")
         self.progress.setValue(10)
         QApplication.processEvents()
-        out, rc = run_cmd(f"pkexec btrfs property set '{path}' compression zstd:3", timeout=300)
+        out, rc = run_cmd(
+            ["pkexec", "btrfs", "property", "set", str(path), "compression", "zstd:3"],
+            timeout=300)
         self.progress.setValue(100)
         if rc == 0:
             self.status_lbl.setText(f"Compression applied to {Path(path).name}")
@@ -790,7 +801,9 @@ class StorageTab(QWidget):
         self.status_lbl.setText(f"Defragmenting {Path(path).name}...")
         self.progress.setValue(10)
         QApplication.processEvents()
-        out, rc = run_cmd(f"pkexec btrfs defrag -r -clzc zstd:3 '{path}'", timeout=600)
+        out, rc = run_cmd(
+            ["pkexec", "btrfs", "defrag", "-r", "-clzc", "zstd:3", str(path)],
+            timeout=600)
         self.progress.setValue(100)
         if rc == 0:
             self.status_lbl.setText(f"Defrag complete for {Path(path).name}")
@@ -810,7 +823,7 @@ class StorageTab(QWidget):
         self.status_lbl.setText("Starting scrub...")
         self.progress.setValue(20)
         QApplication.processEvents()
-        out, rc = run_cmd("pkexec btrfs scrub start /mnt/aion-games", timeout=30)
+        out, rc = run_cmd(["pkexec", "btrfs", "scrub", "start", "/mnt/aion-games"], timeout=30)
         self.progress.setValue(100)
         if rc == 0:
             self.status_lbl.setText("Scrub started. Check: btrfs scrub status /mnt/aion-games")
@@ -917,7 +930,7 @@ class CommunityTab(QWidget):
         self.fetch_btn.setEnabled(False)
         self.fetch_btn.setText("Fetching...")
         QApplication.processEvents()
-        out, rc = run_cmd(f"curl -sL '{url}'", timeout=15)
+        out, rc = run_cmd(["curl", "-sL", url], timeout=15)
         self.fetch_btn.setEnabled(True)
         self.fetch_btn.setText("Browse Online Profiles")
         if rc != 0 or not out:

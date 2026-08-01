@@ -19,7 +19,8 @@ LOG_FILE = LOG_DIR / "key-mapper.log"
 
 CONFIG_DIR = Path.home() / ".config" / "aion"
 KEYMAPS_FILE = CONFIG_DIR / "keymaps.json"
-ONLINE_PROFILES_URL = "https://raw.githubusercontent.com/aion/keyprofiles/main/profiles"
+# Offline-only: no remote profile fetching. The daemon must not initiate
+# any network egress (see aion-key-mapper.service PrivateNetwork=true).
 
 logging.basicConfig(
     level=logging.INFO,
@@ -354,22 +355,6 @@ class KeyMapperDaemon:
             self.profiles[key] = self._parse_profile(key, data)
         logger.info("Created default profiles")
 
-    def _fetch_remote_profile(self, package_name):
-        try:
-            import urllib.request
-            import urllib.error
-            url = f"{ONLINE_PROFILES_URL}/{package_name}.json"
-            req = urllib.request.Request(url, headers={"User-Agent": "Aion-KeyMapper/1.0"})
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                profile = self._parse_profile(package_name, data)
-                self.profiles[package_name] = profile
-                self._save_profiles()
-                return profile
-        except Exception as e:
-            logger.debug("No remote profile for %s: %s", package_name, e)
-            return None
-
     def _save_profiles(self):
         data = {"profiles": {}}
         for key, p in self.profiles.items():
@@ -499,9 +484,6 @@ class KeyMapperDaemon:
             )
             self.profiles[package_name] = profile
             return profile
-        remote = self._fetch_remote_profile(package_name)
-        if remote:
-            return remote
         if "fps" in self.profiles:
             return self.profiles["fps"]
         return KeyMappingProfile(name="generic", package=package_name)

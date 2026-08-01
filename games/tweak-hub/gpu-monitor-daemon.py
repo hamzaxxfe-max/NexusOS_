@@ -49,10 +49,20 @@ def find_intel_gpu():
 
 
 def read_sysfs(path):
+    """Read a sysfs attribute without following symlinks (O_NOFOLLOW).
+
+    A malicious user could swap a sysfs file for a symlink pointing at a
+    sensitive file (e.g. /etc/shadow) — reading it would leak contents into
+    the stats JSON. O_NOFOLLOW refuses such paths.
+    """
     try:
-        with open(path, "r") as f:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    except OSError:
+        return ""
+    try:
+        with os.fdopen(fd, "r") as f:
             return f.read().strip()
-    except (FileNotFoundError, PermissionError, OSError):
+    except OSError:
         return ""
 
 

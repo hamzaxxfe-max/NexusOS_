@@ -6,8 +6,7 @@ Wants=graphical.target
 ConditionPathExists=/usr/lib/aion/daemon/security-bypass-daemon.py
 
 [Service]
-Type=dbus
-BusName=org.aion.SecurityBypass
+Type=simple
 ExecStart=/usr/bin/python3 /usr/lib/aion/daemon/security-bypass-daemon.py
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
@@ -64,7 +63,6 @@ SyslogIdentifier=aion-security
 
 TimeoutStartSec=30
 TimeoutStopSec=15
-WatchdogSec=60
 
 [Install]
 WantedBy=graphical.target

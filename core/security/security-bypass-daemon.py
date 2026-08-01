@@ -515,26 +515,15 @@ class SecurityBypassDaemon(QObject):
                 if proc:
                     logger.info("Sandboxed execution started: PID %d", proc.pid)
                 else:
-                    logger.error("Failed to sandbox %s, falling back to direct execution", resolved)
-                    try:
-                        subprocess.Popen(
-                            [resolved],
-                            stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL,
-                            start_new_session=True,
-                        )
-                    except OSError as e:
-                        logger.error("Failed to execute %s: %s", resolved, e)
+                    logger.error(
+                        "Sandbox failed for %s — refusing to fall back to "
+                        "unsandboxed (root) execution. Blocked.", resolved)
+                    self._log_block_event(resolved)
             else:
-                try:
-                    subprocess.Popen(
-                        [resolved],
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                        start_new_session=True,
-                    )
-                except OSError as e:
-                    logger.error("Failed to execute %s: %s", resolved, e)
+                self._log_block_event(resolved)
+                logger.warning(
+                    "Sandboxing disabled for %s — refusing to execute "
+                    "untrusted file as root. Blocked.", resolved)
         else:
             logger.info("User blocked execution of: %s", resolved)
             self._log_block_event(resolved)
