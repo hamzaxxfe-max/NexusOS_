@@ -800,6 +800,125 @@ deploy_core_components() {
     fi
 }
 
+# Copy the 4 killer features into the ISO (scripts + systemd units).
+# CRITICAL: previously features/ was never deployed, so the ISO shipped
+# without quick-resume / vram-scaler / cloud-sync / zero-lag-record.
+deploy_features() {
+    log_info "Deploying killer features..."
+
+    if [[ ! -d "${SCRIPT_DIR}/features" ]]; then
+        log_warn "  features/ not found, skipping"
+        return 0
+    fi
+
+    mkdir -p "${AIROOTFS}/usr/lib/aion/features"
+
+    # Python feature modules (strip __pycache__)
+    find "${SCRIPT_DIR}/features" -maxdepth 1 -name '*.py' -exec cp -a {} "${AIROOTFS}/usr/lib/aion/features/" \;
+
+    # CLI wrappers so features are on PATH
+    mkdir -p "${AIROOTFS}/usr/local/bin"
+    for f in quick-resume vram-scaler cloud-sync zero-lag-record; do
+        if [[ -f "${SCRIPT_DIR}/features/${f}.py" ]]; then
+            cat > "${AIROOTFS}/usr/local/bin/aion-${f}" << WRAPEOF
+#!/usr/bin/env bash
+exec /usr/bin/python3 /usr/lib/aion/features/${f}.py "\$@"
+WRAPEOF
+            chmod +x "${AIROOTFS}/usr/local/bin/aion-${f}"
+        fi
+    done
+
+    # systemd units for each feature
+    local features_wants="${AIROOTFS}/etc/systemd/system/multi-user.target.wants"
+    mkdir -p "${features_wants}"
+
+    # quick-resume daemon
+    if [[ -f "${SCRIPT_DIR}/features/quick-resume.py" ]]; then
+        cat > "${AIROOTFS}/etc/systemd/system/aion-quick-resume.service" << 'QRSVC'
+[Unit]
+Description=Aion Quick Resume Daemon (game freeze/restore)
+After=local-fs.target
+ConditionVirtualization=!container
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/lib/aion/features/quick-resume.py daemon
+Restart=on-failure
+RestartSec=10
+Nice=5
+
+[Install]
+WantedBy=multi-user.target
+QRSVC
+        ln -sf /etc/systemd/system/aion-quick-resume.service "${features_wants}/aion-quick-resume.service"
+        log_success "  quick-resume → /usr/lib/aion/features/ + unit"
+    fi
+
+    # vram-scaler daemon (AMD only; guarded in the script itself)
+    if [[ -f "${SCRIPT_DIR}/features/vram-scaler.py" ]]; then
+        cat > "${AIROOTFS}/etc/systemd/system/aion-vram-scaler.service" << 'VRSVC'
+[Unit]
+Description=Aion Dynamic VRAM Scaler
+After=local-fs.target
+ConditionPathExists=/sys/class/drm
+ConditionVirtualization=!container
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/lib/aion/features/vram-scaler.py daemon
+Restart=on-failure
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target
+VRSVC
+        ln -sf /etc/systemd/system/aion-vram-scaler.service "${features_wants}/aion-vram-scaler.service"
+        log_success "  vram-scaler → /usr/lib/aion/features/ + unit"
+    fi
+
+    # cloud-sync daemon
+    if [[ -f "${SCRIPT_DIR}/features/cloud-sync.py" ]]; then
+        cat > "${AIROOTFS}/etc/systemd/system/aion-cloud-sync.service" << 'CSSVC'
+[Unit]
+Description=Aion Cloud Save Sync Daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/lib/aion/features/cloud-sync.py sync
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+CSSVC
+        ln -sf /etc/systemd/system/aion-cloud-sync.service "${features_wants}/aion-cloud-sync.service"
+        log_success "  cloud-sync → /usr/lib/aion/features/ + unit"
+    fi
+
+    # zero-lag-record daemon (replay buffer)
+    if [[ -f "${SCRIPT_DIR}/features/zero-lag-record.py" ]]; then
+        cat > "${AIROOTFS}/etc/systemd/system/aion-zero-lag-record.service" << 'ZRSVC'
+[Unit]
+Description=Aion Zero-Lag Recording Replay Buffer
+After=pipewire.service wireplumber.service
+Wants=pipewire.service wireplumber.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/lib/aion/features/zero-lag-record.py daemon
+Restart=on-failure
+RestartSec=10
+Nice=5
+
+[Install]
+WantedBy=graphical.target
+ZRSVC
+        ln -sf /etc/systemd/system/aion-zero-lag-record.service "${features_wants}/aion-zero-lag-record.service"
+        log_success "  zero-lag-record → /usr/lib/aion/features/ + unit"
+    fi
+}
+
 # Copy all Aion UI components into the ISO filesystem.
 deploy_ui_components() {
     log_info "Deploying UI components..."
@@ -891,6 +1010,7 @@ deploy_all_components() {
     deploy_ui_components
     deploy_android_components
     deploy_performance_components
+    deploy_features
     deploy_hub_components
     deploy_config_components
     log_success "All components deployed"

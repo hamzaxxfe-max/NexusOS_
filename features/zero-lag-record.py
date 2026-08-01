@@ -17,6 +17,7 @@ import argparse
 import json
 import logging
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -152,6 +153,15 @@ def get_encoder_args(encoder: str, preset: dict) -> list:
             "-qp", cq,
         ]
 
+    elif encoder == "qsv":
+        return [
+            "-c:v", "hevc_qsv" if codec == "hevc" else "h264_qsv",
+            "-preset", preset.get("preset", "medium"),
+            "-b:v", bitrate,
+            "-global_quality", cq,
+            "-look_ahead", "0",
+        ]
+
     elif encoder == "amf":
         return [
             "-c:v", "hevc_amf" if codec == "hevc" else "h264_amf",
@@ -204,14 +214,13 @@ def record_game(game_name: str, preset_name: str = "balanced",
     preset = PRESETS.get(preset_name, PRESETS["balanced"])
     encoder = detect_encoder()
 
-    if encoder == "pipewire":
-        source = get_pipewire_source()
-        if not source:
-            logger.error("No PipeWire screen source found")
-            return False
-
+    # Always prefer PipeWire capture (works on Wayland AND X11). Only fall
+    # back to x11grab when PipeWire capture is unavailable.
+    source = get_pipewire_source()
+    if source:
         input_args = ["-f", "pipewire", "-i", source]
     else:
+        logger.warning("PipeWire capture unavailable, falling back to x11grab")
         # Find game window
         input_args = ["-f", "x11grab", "-framerate", str(preset["fps"])]
 
@@ -245,25 +254,28 @@ def record_game(game_name: str, preset_name: str = "balanced",
         except (subprocess.TimeoutExpired, FileNotFoundError):
             input_args.extend(["-i", ":0.0"])
 
-    # Output path
+    # Output path. Use .mp4 when we need -movflags +faststart (mp4-only);
+    # .mkv must NOT get -movflags.
     if not output:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_dir = Path.home() / "Videos" / "Aion"
         output_dir.mkdir(parents=True, exist_ok=True)
-        output = str(output_dir / f"{game_name}_{timestamp}.mkv")
+        output = str(output_dir / f"{game_name}_{timestamp}.mp4")
 
-    # Build FFmpeg command
+    # Build FFmpeg command. `-t 0` would produce an EMPTY file, so only
+    # add a duration flag when one is actually requested.
     encoder_args = get_encoder_args(encoder, preset)
 
     cmd = ["ffmpeg", "-y"] + input_args + [
-        "-t", str(duration) if duration else "0",
         "-r", str(preset["fps"]),
         "-pix_fmt", "yuv420p",
-    ] + encoder_args + [
-        "-c:a", "copy",
-        "-movflags", "+faststart",
-        output,
     ]
+    if duration:
+        cmd += ["-t", str(duration)]
+    cmd += encoder_args + ["-c:a", "copy"]
+    if output.lower().endswith(".mp4"):
+        cmd += ["-movflags", "+faststart"]
+    cmd += [output]
 
     logger.info("Recording with %s encoder: %s", encoder, output)
     logger.debug("Command: %s", " ".join(cmd))
@@ -287,14 +299,16 @@ def start_replay_buffer(game_name: str, duration: int = 30):
 
     preset = PRESETS["replay"]
     encoder = detect_encoder()
-    source = get_pipewire_source() if encoder == "pipewire" else ":0.0"
+    source = get_pipewire_source() or ":0.0"
+    input_fmt = "pipewire" if source != ":0.0" else "x11grab"
 
-    # Circular buffer using FFmpeg segment muxer
+    # Circular buffer using FFmpeg segment muxer (replay segments in mkv —
+    # NO -movflags +faststart, which is mp4-only and breaks matroska).
     output_pattern = str(REPLAY_DIR / f"replay_%03d.mkv")
 
     cmd = [
         "ffmpeg", "-y",
-        "-f", "pipewire" if encoder == "pipewire" else "x11grab",
+        "-f", input_fmt,
         "-i", source,
         "-t", str(duration),
         "-r", str(preset["fps"]),
@@ -323,20 +337,37 @@ def start_replay_buffer(game_name: str, duration: int = 30):
 
 def save_replay(game_name: str):
     """Save the current replay buffer to a permanent location."""
-    # Find the latest replay segment
+    # Concatenate the recent segments (the daemon overwrites segments in
+    # a rolling fashion, so take the last N within the window).
     segments = sorted(REPLAY_DIR.glob("replay_*.mkv"))
     if not segments:
         logger.error("No replay segments found")
         return False
 
-    latest = segments[-1]
+    recent = segments[-min(len(segments), 3):]
+
     output_dir = Path.home() / "Videos" / "Aion" / "Replays"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output = output_dir / f"replay_{game_name}_{timestamp}.mkv"
 
-    shutil.copy2(str(latest), str(output))
+    if len(recent) == 1:
+        shutil.copy2(str(recent[0]), str(output))
+    else:
+        # Concatenate segments losslessly into the replay file.
+        list_file = REPLAY_DIR / "concat.txt"
+        list_file.write_text("".join(f"file '{seg}'\n" for seg in recent))
+        cat_cmd = [
+            "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+            "-i", str(list_file), "-c", "copy", str(output),
+        ]
+        result = subprocess.run(cat_cmd, capture_output=True, text=True, timeout=120)
+        if result.returncode != 0:
+            logger.error("Replay concat failed: %s", result.stderr[:300])
+            shutil.copy2(str(recent[-1]), str(output))
+        list_file.unlink(missing_ok=True)
+
     logger.info("Replay saved: %s", output)
     return True
 

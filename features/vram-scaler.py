@@ -32,7 +32,9 @@ logger = logging.getLogger("vram-scaler")
 AMD_GTT_PATH = "/sys/class/drm/card0/device/gtt_size"
 AMD_VRAM_PATH = "/sys/class/drm/card0/device/mem_info_vram_total"
 AMD_VRAM_USED_PATH = "/sys/class/drm/card0/device/mem_info_vram_used"
-AMD_GTT_USED_PATH = "/sys/class/drm/card0/device/gtt_used"
+# NOTE: the kernel reports GTT usage at mem_info_gtt_used (gtt_used does
+# not exist on amdgpu).
+AMD_GTT_USED_PATH = "/sys/class/drm/card0/device/mem_info_gtt_used"
 
 # Intel Iris Xe paths
 INTEL_GTT_PATH = "/sys/class/drm/card0/gt_cur_freq_mhz"
@@ -130,43 +132,41 @@ def get_gtt_size_mb() -> int:
 
 
 def set_gtt_size_mb(size_mb: int) -> bool:
-    """Set GTT allocation size (requires root)."""
+    """Set GTT allocation size (requires root).
+
+    Returns True only if the size was actually applied at runtime via
+    sysfs. The modprobe option file is a boot-time hint and never counts
+    as a successful runtime change.
+    """
     gtt_path = Path(AMD_GTT_PATH)
     if not gtt_path.exists():
         logger.debug("GTT path not found: %s", AMD_GTT_PATH)
         return False
 
-    try:
-        # This requires kernel module parameter or sysfs write
-        # On AMD, GTT is dynamically managed by the driver
-        # We can influence it via:
-        # 1. amdgpu.gttsize module parameter
-        # 2. Or by pre-allocating via madvise
+    logger.info("Attempting to set GTT size to %d MB", size_mb)
 
-        logger.info("Attempting to set GTT size to %d MB", size_mb)
-
-        # Method 1: Try module parameter (requires reboot for full effect)
-        modprobe_conf = Path("/etc/modprobe.d/aion-gtt.conf")
+    # Method 1: Boot-time module parameter (only written once — not on
+    # every loop iteration).
+    modprobe_conf = Path("/etc/modprobe.d/aion-gtt.conf")
+    if not modprobe_conf.exists():
         modprobe_conf.parent.mkdir(parents=True, exist_ok=True)
         modprobe_conf.write_text(f"options amdgpu gttsize={size_mb}\n")
+        logger.info("Wrote boot-time GTT option: gttsize=%d", size_mb)
 
-        # Method 2: Try runtime adjustment via sysfs (if available)
-        # Some kernels support dynamic GTT adjustment
-        for card in Path("/sys/class/drm").glob("card*"):
-            gtt_size_file = card / "device" / "gtt_size"
-            if gtt_size_file.exists():
-                try:
-                    gtt_size_file.write_text(str(size_mb * 1024 * 1024))
-                    logger.info("GTT size set to %d MB via sysfs", size_mb)
-                    return True
-                except PermissionError:
-                    logger.debug("No permission to write GTT via sysfs")
+    # Method 2: Runtime adjustment via sysfs. If the write succeeds this
+    # is a real, applied change; otherwise it did NOT happen.
+    for card in Path("/sys/class/drm").glob("card*"):
+        gtt_size_file = card / "device" / "gtt_size"
+        if gtt_size_file.exists():
+            try:
+                gtt_size_file.write_text(str(size_mb * 1024 * 1024))
+                logger.info("GTT size set to %d MB via sysfs", size_mb)
+                return True
+            except PermissionError:
+                logger.debug("No permission to write GTT via sysfs")
 
-        return True
-
-    except Exception as e:
-        logger.error("Failed to set GTT size: %s", e)
-        return False
+    logger.warning("GTT could not be changed at runtime (read-only sysfs)")
+    return False
 
 
 def get_recommended_gtt() -> int:
@@ -177,8 +177,8 @@ def get_recommended_gtt() -> int:
         if total_ram <= ram_gb:
             return default_gtt
 
-    # For systems with >32GB RAM
-    return 4096
+    # For systems with >32GB RAM, scale up to the largest tier.
+    return 8192
 
 
 def scale_vram(threshold: float = 80.0, interval: int = 5):
@@ -191,7 +191,8 @@ def scale_vram(threshold: float = 80.0, interval: int = 5):
 
     if gpu_type != "amd":
         logger.info("Dynamic VRAM scaling only supported on AMD APUs")
-        logger.info("GPU type: %s — monitoring only", gpu_type)
+        logger.info("GPU type: %s — exiting (no scaling)", gpu_type)
+        return
 
     recommended = get_recommended_gtt()
     current = get_gtt_size_mb()

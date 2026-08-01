@@ -18,11 +18,10 @@ import argparse
 import json
 import logging
 import os
+import re
 import shutil
-import signal
 import subprocess
 import sys
-import time
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -34,6 +33,9 @@ STATE_FILE = SNAPSHOT_DIR / "state.json"
 MAX_SNAPSHOTS = 5
 MAX_SNAPSHOT_SIZE_GB = 16
 
+# Only safe characters — blocks path traversal ("freeze ../foo").
+GAME_NAME_RE = re.compile(r"^[a-zA-Z0-9 _-]+$")
+
 logger = logging.getLogger("quick-resume")
 
 
@@ -44,6 +46,14 @@ def setup_logging():
     logger.addHandler(handler)
     logger.addHandler(logging.StreamHandler())
     logger.setLevel(logging.DEBUG)
+
+
+def validate_game_name(game_name: str) -> bool:
+    """Reject names that could escape the snapshot dir."""
+    if not game_name or not GAME_NAME_RE.match(game_name):
+        logger.error("Invalid game name (only letters, digits, space, _ and - allowed): %r", game_name)
+        return False
+    return True
 
 
 def check_criu() -> bool:
@@ -124,6 +134,8 @@ def get_process_memory_mb(pid: int) -> float:
 
 def freeze_game(game_name: str) -> bool:
     """Freeze a game using CRIU checkpoint."""
+    if not validate_game_name(game_name):
+        return False
     if not check_criu():
         return False
     if not check_permissions():
@@ -153,7 +165,8 @@ def freeze_game(game_name: str) -> bool:
         logger.error("Not enough disk space (%.1f GB free, need %.1f GB)", free_gb, mem_mb / 1024 * 1.5)
         return False
 
-    # Checkpoint with CRIU
+    # Checkpoint with CRIU. NOTE: no --leave-running — a real freeze must
+    # stop the process so the snapshot is consistent and memory is freed.
     logger.info("Freezing game '%s' (PID %d)...", game_name, pid)
 
     criu_cmd = [
@@ -161,7 +174,6 @@ def freeze_game(game_name: str) -> bool:
         "-t", str(pid),
         "-D", str(snapshot_dir),
         "--shell-job",
-        "--leave-running",
         "--ext-unix-sk",
         "--link-remap",
         "--manage-cgroups",
@@ -196,6 +208,8 @@ def freeze_game(game_name: str) -> bool:
 
 def restore_game(game_name: str) -> bool:
     """Restore a frozen game using CRIU restore."""
+    if not validate_game_name(game_name):
+        return False
     if not check_criu():
         return False
     if not check_permissions():
@@ -256,6 +270,8 @@ def list_frozen() -> list:
 
 def delete_snapshot(game_name: str) -> bool:
     """Delete a frozen game snapshot."""
+    if not validate_game_name(game_name):
+        return False
     snapshot_dir = SNAPSHOT_DIR / game_name
     if not snapshot_dir.exists():
         logger.error("No snapshot found for '%s'", game_name)
@@ -276,11 +292,11 @@ def _update_state(game_name: str, metadata: dict):
 
     state[game_name] = metadata
 
-    # Enforce max snapshots limit
+    # Enforce max snapshots limit — evict oldest snapshot AND delete its files.
     if len(state) > MAX_SNAPSHOTS:
-        # Remove oldest
-        oldest = min(state.items(), key=lambda x: x[1].get("frozen_at", ""))
-        del state[oldest[0]]
+        oldest_name, _oldest_meta = min(state.items(), key=lambda x: x[1].get("frozen_at", ""))
+        del state[oldest_name]
+        shutil.rmtree(SNAPSHOT_DIR / oldest_name, ignore_errors=True)
 
     with open(STATE_FILE, "w") as f:
         json.dump(state, f, indent=2)
@@ -300,28 +316,87 @@ def _remove_from_state(game_name: str):
         json.dump(state, f, indent=2)
 
 
+def _guess_game_name(pid: int) -> Optional[str]:
+    """Derive a human-safe game name from a game process cmdline."""
+    try:
+        cmdline = (Path(f"/proc/{pid}/cmdline").read_text(errors="replace")).replace("\x00", " ").strip()
+    except (FileNotFoundError, PermissionError):
+        return None
+    if not cmdline:
+        try:
+            return (Path(f"/proc/{pid}/comm").read_text(errors="replace")).strip()
+        except (FileNotFoundError, PermissionError):
+            return None
+
+    lower = cmdline.lower()
+    # Common game engines keep the game name in argv; use the last
+    # non-option argument that looks like an executable/game.
+    parts = [p for p in cmdline.split() if p and not p.startswith(("-", "/"))]
+    if any(k in lower for k in ("steam", "wine", "proton")):
+        for p in reversed(parts):
+            if p.lower().endswith((".exe", ".sh", ".bin")) or ("game" in p.lower() or "dota" in p.lower() or "cs2" in p.lower()):
+                name = Path(p).stem
+                if validate_name_only(name):
+                    return name
+    name = Path(cmdline.split()[0]).stem if cmdline.split() else None
+    return name if name and validate_name_only(name) else None
+
+
+def validate_name_only(name: str) -> bool:
+    return bool(name) and bool(GAME_NAME_RE.match(name))
+
+
+def _suspend_games():
+    """Freeze all running game processes before system suspend."""
+    logger.info("PrepareForSleep signal received, freezing games...")
+    frozen = 0
+    for proc in Path("/proc").iterdir():
+        if not proc.name.isdigit():
+            continue
+        pid = int(proc.name)
+        try:
+            cmdline = (proc / "cmdline").read_text(errors="replace").lower()
+        except (FileNotFoundError, PermissionError):
+            continue
+        if any(k in cmdline for k in ("steam", "wine", "proton")):
+            game_name = _guess_game_name(pid)
+            if not game_name:
+                logger.warning("Could not derive game name for PID %d, skipping", pid)
+                continue
+            if list_frozen() and game_name in {s["game_name"] for s in list_frozen()}:
+                logger.info("Game '%s' already frozen, skipping", game_name)
+                continue
+            if freeze_game(game_name):
+                frozen += 1
+    logger.info("Froze %d game(s) before suspend", frozen)
+
+
+def _wait_for_systemd_sleep():
+    """Listen on the logind PrepareForSleep signal using dbus-monitor."""
+    cmd = [
+        "dbus-monitor", "--system",
+        "type='signal',interface='org.freedesktop.login1.Manager',member='PrepareForSleep'",
+    ]
+    try:
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+    except FileNotFoundError:
+        logger.warning("dbus-monitor not available; suspend auto-freeze disabled")
+        return
+    assert proc.stdout is not None
+    try:
+        for line in proc.stdout:
+            if "boolean true" in line:
+                _suspend_games()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        proc.terminate()
+
+
 def run_daemon():
-    """Run as a background daemon to auto-freeze games on suspend."""
-    logger.info("Quick Resume daemon started")
-
-    def handle_suspend(signum, frame):
-        """Freeze all running games before system suspend."""
-        logger.info("Suspend signal received, freezing games...")
-        # Find all running game processes
-        for proc in Path("/proc").iterdir():
-            if proc.name.isdigit():
-                try:
-                    cmdline = (proc / "cmdline").read_text()
-                    if "steam" in cmdline.lower() or "wine" in cmdline.lower():
-                        game_name = proc.name
-                        freeze_game(game_name)
-                except (FileNotFoundError, PermissionError):
-                    pass
-
-    signal.signal(signal.SIGUSR1, handle_suspend)
-
-    while True:
-        time.sleep(60)
+    """Freeze games on system suspend (via logind PrepareForSleep)."""
+    logger.info("Quick Resume daemon started (watching logind PrepareForSleep)")
+    _wait_for_systemd_sleep()
 
 
 def main():
@@ -331,25 +406,28 @@ def main():
     sub = parser.add_subparsers(dest="command")
 
     freeze_p = sub.add_parser("freeze", help="Freeze a running game")
-    freeze_p.add_argument("game_name", help="Name of the game process")
+    freeze_p.add_argument("game_name", nargs="?", help="Name of the game process")
+    freeze_p.add_argument("--game", dest="game_name_opt", help="Name of the game process")
 
     restore_p = sub.add_parser("restore", help="Restore a frozen game")
-    restore_p.add_argument("game_name", help="Name of the game to restore")
+    restore_p.add_argument("game_name", nargs="?", help="Name of the game to restore")
+    restore_p.add_argument("--game", dest="game_name_opt", help="Name of the game to restore")
 
     sub.add_parser("list", help="List frozen games")
 
     delete_p = sub.add_parser("delete", help="Delete a frozen snapshot")
-    delete_p.add_argument("game_name", help="Name of the game to delete")
+    delete_p.add_argument("game_name", nargs="?", help="Name of the game to delete")
+    delete_p.add_argument("--game", dest="game_name_opt", help="Name of the game to delete")
 
     sub.add_parser("daemon", help="Run as background daemon")
 
     args = parser.parse_args()
 
     if args.command == "freeze":
-        success = freeze_game(args.game_name)
+        success = freeze_game(args.game_name or args.game_name_opt)
         sys.exit(0 if success else 1)
     elif args.command == "restore":
-        success = restore_game(args.game_name)
+        success = restore_game(args.game_name or args.game_name_opt)
         sys.exit(0 if success else 1)
     elif args.command == "list":
         snapshots = list_frozen()
@@ -359,7 +437,7 @@ def main():
             for snap in snapshots:
                 print(f"  {snap['game_name']}: {snap['memory_mb']:.0f} MB (frozen {snap['frozen_at']})")
     elif args.command == "delete":
-        success = delete_snapshot(args.game_name)
+        success = delete_snapshot(args.game_name or args.game_name_opt)
         sys.exit(0 if success else 1)
     elif args.command == "daemon":
         run_daemon()

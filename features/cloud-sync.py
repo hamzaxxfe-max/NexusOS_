@@ -30,49 +30,52 @@ LOG_DIR = Path("/var/log/aion")
 LOG_FILE = LOG_DIR / "cloud-sync.log"
 CONFIG_FILE = Path("/etc/aion/cloud-sync.json")
 STATE_FILE = Path("/var/lib/aion/cloud-sync-state.json")
-RCLONE_CONFIG = Path("/root/.config/rclone/rclone.conf")
+# Saves live under the gaming user's home (never /root).
+GAME_HOME = Path(os.environ.get("AION_GAME_HOME", "/home/aion"))
+RCLONE_CONFIG = GAME_HOME / ".config/rclone/rclone.conf"
 
 logger = logging.getLogger("cloud-sync")
 
-# Default game save locations
+# Default game save locations — anchored to GAME_HOME so the daemon
+# syncs the player's real saves regardless of which user runs it.
 SYNC_PATHS = {
     "wine-prefixes": {
-        "path": "~/.wine/drive_c/users",
+        "path": str(GAME_HOME / ".wine/drive_c/users"),
         "pattern": "**/Documents/My Games/**",
         "description": "Wine game saves (My Games folder)",
     },
     "lutris-saves": {
-        "path": "~/Games",
+        "path": str(GAME_HOME / "Games"),
         "pattern": "**/prefix/drive_c/users/*/Documents/**",
         "description": "Lutris game saves",
     },
     "retroarch-saves": {
-        "path": "~/.config/retroarch/saves",
+        "path": str(GAME_HOME / ".config/retroarch/saves"),
         "pattern": "**/*",
         "description": "RetroArch save files",
     },
     "retroarch-states": {
-        "path": "~/.config/retroarch/states",
+        "path": str(GAME_HOME / ".config/retroarch/states"),
         "pattern": "**/*",
         "description": "RetroArch save states",
     },
     "steam-compat": {
-        "path": "~/.local/share/Steam/steamapps/compatdata",
+        "path": str(GAME_HOME / ".local/share/Steam/steamapps/compatdata"),
         "pattern": "**/pfx/drive_c/users/*/Documents/**",
         "description": "Steam Proton saves",
     },
     "cemu-saves": {
-        "path": "~/.local/share/Cemu/mlc01/usr/save",
+        "path": str(GAME_HOME / ".local/share/Cemu/mlc01/usr/save"),
         "pattern": "**/*",
         "description": "Cemu (Wii U) saves",
     },
     "dolphin-saves": {
-        "path": "~/.local/share/dolphin-emu/GC",
+        "path": str(GAME_HOME / ".local/share/dolphin-emu/GC"),
         "pattern": "**/*",
         "description": "Dolphin (GameCube/Wii) saves",
     },
     "yuzu-saves": {
-        "path": "~/.local/share/yuzu/sdmc",
+        "path": str(GAME_HOME / ".local/share/yuzu/sdmc"),
         "pattern": "**/*",
         "description": "Yuzu (Switch) saves",
     },
@@ -145,19 +148,36 @@ def setup_cloud_provider():
 
     remote_name = f"aion-{provider}"
     result = subprocess.run(
-        ["rclone", "config", "create", remote_name, provider],
+        ["rclone", "--config", str(RCLONE_CONFIG), "config", "create", remote_name, provider],
         capture_output=False,
     )
 
     if result.returncode != 0:
         # Try interactive config
-        subprocess.run(["rclone", "config", "create", remote_name, provider])
+        subprocess.run(["rclone", "--config", str(RCLONE_CONFIG), "config", "create", remote_name, provider])
 
-    # Save config
+    # Create a REAL crypt remote wrapping the provider. Encryption must
+    # be an actual rclone crypt remote, not a runtime flag.
+    crypt_remote = f"{remote_name}-crypt"
+    crypt_result = subprocess.run(
+        [
+            "rclone", "--config", str(RCLONE_CONFIG), "config", "create", crypt_remote, "crypt",
+            "remote", f"{remote_name}:Aion-Saves",
+            "filename_encryption", "standard",
+            "directory_name_encryption", "true",
+        ],
+        capture_output=True, text=True,
+    )
+    if crypt_result.returncode != 0:
+        print(f"WARNING: could not create crypt remote: {crypt_result.stderr.strip()}")
+
+    # Save config — point at the crypt remote so all synced saves are
+    # encrypted at rest on the provider.
     config = {
         "provider": provider,
         "remote_name": remote_name,
-        "remote_path": f"{remote_name}:Aion-Saves",
+        "crypt_remote": crypt_remote,
+        "remote_path": f"{crypt_remote}:",
         "sync_paths": list(SYNC_PATHS.keys()),
         "auto_sync": True,
         "sync_interval_hours": 6,
@@ -165,7 +185,7 @@ def setup_cloud_provider():
     }
 
     save_config(config)
-    print(f"\nCloud provider configured: {remote_name}")
+    print(f"\nCloud provider configured: {remote_name} (encrypted via {crypt_remote})")
     print("Run 'aion-cloud-sync sync' to sync your saves.")
     return True
 
@@ -208,16 +228,13 @@ def sync_to_cloud(config: dict) -> bool:
         logger.info("Syncing %s: %s", save_info["description"], src_path)
 
         cmd = [
-            "rclone", "sync",
+            "rclone", "--config", str(RCLONE_CONFIG), "sync",
             str(src_path),
             f"{remote_path}/{save_key}",
             "--progress",
             "--transfers", "4",
             "--checkers", "8",
         ]
-
-        if config.get("encrypt"):
-            cmd.extend(["--crypt-remote", f"{remote_path}-crypt/{save_key}"])
 
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
 
@@ -254,8 +271,10 @@ def restore_from_cloud(config: dict) -> bool:
 
         logger.info("Restoring %s: %s", save_info["description"], src_path)
 
+        # NOTE: use `copy`, never `sync` — sync would DELETE local saves
+        # that don't exist on the remote (data loss on restore).
         cmd = [
-            "rclone", "sync",
+            "rclone", "--config", str(RCLONE_CONFIG), "copy",
             f"{remote_path}/{save_key}",
             str(src_path),
             "--progress",
