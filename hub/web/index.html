@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aion Hub</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">A</span>
+    <div>
+      <h1>Aion Hub</h1>
+      <p class="tagline">Everything you need. One click.</p>
+    </div>
+  </div>
+  <div class="searchbox">
+    <input id="search" type="search" placeholder="Search apps & games…"
+           autocomplete="off">
+  </div>
+  <div class="top-actions">
+    <span id="health" class="pill">…</span>
+    <span id="queue" class="pill">Idle</span>
+  </div>
+</header>
+
+<nav class="filters" id="filters"></nav>
+
+<main>
+  <div id="grid" class="grid"></div>
+  <div id="empty" class="empty hidden">No apps match your search.</div>
+</main>
+
+<div id="toast" class="toast hidden"></div>
+<script src="app.js"></script>
+</body>
+</html>

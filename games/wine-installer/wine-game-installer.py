@@ -15,14 +15,14 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont, QColor, QPainter, QDragEnterEvent, QDropEvent
 
-LOG_DIR = "/var/log/nexusos"
+LOG_DIR = "/var/log/aion"
 LOG_FILE = os.path.join(LOG_DIR, "wine-installer.log")
-LOCK_FILE = "/tmp/nexusos-wine-installer.lock"
-GAMES_DIR = "/opt/nexusos/games"
-WINE_PREFIX_BASE = os.path.expanduser("~/.local/share/nexusos/wine-prefixes")
+LOCK_FILE = "/tmp/aion-wine-installer.lock"
+GAMES_DIR = "/opt/aion/games"
+WINE_PREFIX_BASE = os.path.expanduser("~/.local/share/aion/wine-prefixes")
 DESKTOP_DIR = os.path.expanduser("~/.local/share/applications")
-ICON_DIR = os.path.expanduser("~/.local/share/nexusos/icons")
-GAME_GRID = os.path.expanduser("~/.local/share/nexusos/game-grid.json")
+ICON_DIR = os.path.expanduser("~/.local/share/aion/icons")
+GAME_GRID = os.path.expanduser("~/.local/share/aion/game-grid.json")
 
 BG_PRIMARY = "#121212"
 BG_SECONDARY = "#1A2238"
@@ -191,7 +191,7 @@ class InstallWorker(QThread):
             self.progress.emit(90, "Applying SELinux context...")
             try:
                 subprocess.run(
-                    ["chcon", "-t", "nexusos_game_t", self.exe_path],
+                    ["chcon", "-t", "aion_game_t", self.exe_path],
                     capture_output=True, timeout=10
                 )
             except FileNotFoundError:
@@ -221,7 +221,7 @@ class InstallWorker(QThread):
         for cmd in registry_commands:
             subprocess.run(cmd, env=env, capture_output=True, timeout=10)
 
-        env_file = os.path.join(prefix, "nexusos.env")
+        env_file = os.path.join(prefix, "aion.env")
         env_content = {
             "DXVK_ASYNC": "1",
             "STAGING_SHARED_MEMORY": "1",
@@ -253,7 +253,7 @@ class InstallWorker(QThread):
                 except FileNotFoundError:
                     pass
 
-        env_file = os.path.join(prefix, "nexusos.env")
+        env_file = os.path.join(prefix, "aion.env")
         exec_line = (
             f"env WINEPREFIX={prefix} WINEDEBUG=-all DXVK_ASYNC=1 "
             f"WINEFSYNC=1 WINEESYNC=1 "
@@ -264,7 +264,7 @@ class InstallWorker(QThread):
         desktop_content = (
             f"[Desktop Entry]\n"
             f"Name={self.game_name}\n"
-            f"Comment=NexusOS Wine Game\n"
+            f"Comment=Aion Wine Game\n"
             f"Exec={exec_line}\n"
             f"Type=Application\n"
             f"Categories=Game;\n"
@@ -273,7 +273,7 @@ class InstallWorker(QThread):
             f"StartupNotify=true\n"
         )
 
-        desktop_path = os.path.join(DESKTOP_DIR, f"nexusos-wine-{safe_name}.desktop")
+        desktop_path = os.path.join(DESKTOP_DIR, f"aion-wine-{safe_name}.desktop")
         with open(desktop_path, "w") as f:
             f.write(desktop_content)
         os.chmod(desktop_path, 0o755)
@@ -373,7 +373,7 @@ class WineInstallerWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.scale = ScaleManager()
-        self.setWindowTitle("NexusOS Wine Game Installer")
+        self.setWindowTitle("Aion Wine Game Installer")
         self.setMinimumSize(self.scale.px(700), self.scale.px(550))
         self.resize(
             min(self.scale.raw_w - 300, self.scale.px(800)),

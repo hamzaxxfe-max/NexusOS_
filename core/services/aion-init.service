@@ -1,0 +1,48 @@
+[Unit]
+Description=Aion Immutable Root Initialization
+Documentation=https://aion.dev/docs/immutable-root
+DefaultDependencies=no
+After=systemd-udev-settle.service
+Before=local-fs.target systemd-tmpfiles-setup.service systemd-remount-fs.service
+Requires=systemd-udev-settle.service
+Wants=systemd-udev-settle.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/lib/aion/immount-root.sh --setup
+ExecStart=/usr/lib/aion/immount-root.sh --mount-overlay
+ExecStop=/usr/lib/aion/immount-root.sh --unmount-overlay
+ExecReload=/usr/lib/aion/immount-root.sh --remount-overlay
+ExecCondition=/bin/sh -c 'test ! -f /etc/aion/.maintenance-mode'
+
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+ProtectSystem=false
+ProtectHome=false
+PrivateTmp=no
+PrivateNetwork=no
+PrivateDevices=no
+
+CapabilityBoundingSet=CAP_SYS_ADMIN CAP_SYS_RESOURCE CAP_DAC_OVERRIDE CAP_FOWNER CAP_CHOWN CAP_SETUID CAP_SETGID CAP_MKNOD CAP_NET_ADMIN CAP_SYS_PTRACE CAP_SYS_RAWIO CAP_LINUX_IMMUTABLE
+AmbientCapabilities=CAP_SYS_ADMIN CAP_SYS_RESOURCE CAP_DAC_OVERRIDE CAP_FOWNER CAP_CHOWN CAP_SETUID CAP_SETGID CAP_MKNOD CAP_NET_ADMIN CAP_SYS_PTRACE CAP_SYS_RAWIO CAP_LINUX_IMMUTABLE
+
+NoNewPrivileges=no
+
+ReadWritePaths=/run/aion /var/log/aion /tmp /var/tmp /etc/aion
+BindPaths=/proc:/proc
+BindPaths=/sys:/sys
+BindPaths=/dev:/dev
+
+MountAPIVFS=yes
+ProtectProc=noaccess
+
+TimeoutStartSec=120
+TimeoutStopSec=30
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=aion-init
+
+[Install]
+WantedBy=local-fs.target

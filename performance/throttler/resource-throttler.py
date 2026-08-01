@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NexusOS Resource Throttler — Gaming performance optimizer.
+"""Aion Resource Throttler — Gaming performance optimizer.
 
 Monitors window focus, detects games, and dynamically manages CPU/memory
 resources via cgroups v2. Liberates memory for game processes and throttles
@@ -22,13 +22,14 @@ from typing import Optional
 
 LOG_FORMAT = "%(asctime)s [%(levelname)s] %(message)s"
 LOG_DATE = "%Y-%m-%d %H:%M:%S"
-LOG_FILE = Path("/var/log/nexusos/resource-throttler.log")
-CONFIG_PATH = Path(os.environ.get("NEXUSOS_CONFIG", "/etc/nexusos/config.json"))
+LOG_FILE = Path("/var/log/aion/resource-throttler.log")
+CONFIG_PATH = Path(os.environ.get("AION_CONFIG", "/etc/aion/config.json"))
 CGROUP_ROOT = Path("/sys/fs/cgroup")
-GAMING_SLICE = "nexusos-gaming.slice"
-INSTALL_SLICE = "nexusos-install.slice"
+GAMING_SLICE = "aion-gaming.slice"
+INSTALL_SLICE = "aion-install.slice"
 POLL_INTERVAL = 2
 TARGET_FREE_MB = 7168
+PERFORMANCE_PROFILE = Path(os.environ.get("AION_PERFORMANCE_PROFILE", "/etc/aion/performance-profile.json"))
 CRITICAL_SERVICES = [
     "bluetooth.service",
     "cups.service",
@@ -51,11 +52,28 @@ if libx11_path:
     except OSError:
         libx11 = None
 
-logger = logging.getLogger("nexusos-throttler")
+logger = logging.getLogger("aion-throttler")
+
+
+def resolve_target_free_mb() -> int:
+    """Load the proportional free-RAM target from the performance engine.
+
+    Falls back to the legacy constant when the engine profile is unavailable,
+    so the throttler never hard-fails on a fresh boot.
+    """
+    try:
+        if PERFORMANCE_PROFILE.is_file():
+            data = json.loads(PERFORMANCE_PROFILE.read_text(encoding="utf-8"))
+            target = int(data["resource_allocation"]["target_free_mb"])
+            if target > 0:
+                return target
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    return TARGET_FREE_MB
 
 
 class CGroupManager:
-    """Manages cgroups v2 hierarchies for nexusos slices."""
+    """Manages cgroups v2 hierarchies for aion slices."""
 
     def __init__(self, root: Path = CGROUP_ROOT):
         self.root = root
@@ -67,10 +85,10 @@ class CGroupManager:
             path.mkdir(parents=True, exist_ok=True)
             self._write(path / "cgroup.subtree_control", "+cpu +memory")
 
-        gaming_procs = self.gaming_path / "nexusos-games.scope"
+        gaming_procs = self.gaming_path / "aion-games.scope"
         gaming_procs.mkdir(exist_ok=True)
 
-        install_procs = self.install_path / "nexusos-install.scope"
+        install_procs = self.install_path / "aion-install.scope"
         install_procs.mkdir(exist_ok=True)
 
     def set_cpu_weight(self, scope: str, weight: int) -> None:
@@ -128,13 +146,13 @@ class CGroupManager:
         for scope_name in self._get_all_cgroup_scopes():
             if GAMING_SLICE not in scope_name and INSTALL_SLICE not in scope_name:
                 self.set_cpu_weight(scope_name, 10)
-        self.set_memory_max("nexusos-install.scope", 256 * 1024 * 1024)
+        self.set_memory_max("aion-install.scope", 256 * 1024 * 1024)
 
     def set_idle_restore(self) -> None:
         self.set_cpu_weight(GAMING_SLICE, 100)
         for scope_name in self._get_all_cgroup_scopes():
             self.set_cpu_weight(scope_name, 100)
-        self.set_memory_max("nexusos-install.scope", -1)
+        self.set_memory_max("aion-install.scope", -1)
 
     def _get_all_cgroup_scopes(self) -> list[str]:
         scopes = []
@@ -504,7 +522,7 @@ class DecompressionMonitor:
 
 
 class ConfigLoader:
-    """Loads NexusOS configuration from JSON."""
+    """Loads Aion configuration from JSON."""
 
     def __init__(self, path: Path = CONFIG_PATH):
         self.path = path
@@ -528,7 +546,7 @@ class ConfigLoader:
         return game_paths, game_names
 
 
-class NexusOSThrottler:
+class AionThrottler:
     """Main throttler orchestrator."""
 
     def __init__(self):
@@ -537,7 +555,7 @@ class NexusOSThrottler:
 
         self.cgroup = CGroupManager()
         self.service_mgr = ServiceManager()
-        self.memory = MemoryManager()
+        self.memory = MemoryManager(resolve_target_free_mb())
         self.detector = ForegroundDetector()
         self.decomp_monitor = DecompressionMonitor(self.cgroup)
         self.config = ConfigLoader()
@@ -563,7 +581,7 @@ class NexusOSThrottler:
 
     def run(self) -> None:
         self.setup()
-        logger.info("NexusOS Resource Throttler started")
+        logger.info("Aion Resource Throttler started")
 
         while self.running:
             try:
@@ -605,7 +623,8 @@ class NexusOSThrottler:
         self.service_mgr.stop_non_critical()
 
         free_mb = self.memory.ensure_free_memory()
-        logger.info("Game mode active: %.0f MB free RAM (target: %d MB)", free_mb, TARGET_FREE_MB)
+        logger.info("Game mode active: %.0f MB free RAM (target: %d MB)",
+                    free_mb, self.memory.target_free_mb)
 
         self._apply_background_memory_caps()
 
@@ -622,10 +641,11 @@ class NexusOSThrottler:
 
     def _maintain_game_mode(self) -> None:
         free_mb = self.memory.get_free_mb()
-        if free_mb < TARGET_FREE_MB * 0.85:
+        target = self.memory.target_free_mb
+        if free_mb < target * 0.85:
             logger.info("Free RAM dropped to %.0f MB, reclaiming", free_mb)
             free_mb = self.memory.ensure_free_memory()
-            if free_mb < TARGET_FREE_MB * 0.7:
+            if free_mb < target * 0.7:
                 logger.warning("Cannot maintain target free RAM: %.0f MB", free_mb)
 
     def _apply_background_memory_caps(self) -> None:
@@ -657,8 +677,8 @@ class NexusOSThrottler:
             for pid in bg_pids:
                 try:
                     mem_max = Path(f"/proc/{pid}/cgroup").read_text()
-                    if "nexusos" in mem_max:
-                        self.cgroup.add_pid("nexusos-gaming.scope", pid)
+                    if "aion" in mem_max:
+                        self.cgroup.add_pid("aion-gaming.scope", pid)
                 except OSError:
                     pass
 
@@ -719,7 +739,7 @@ def main() -> int:
         logger.critical("Prerequisites not met, exiting")
         return 1
 
-    throttler = NexusOSThrottler()
+    throttler = AionThrottler()
     throttler.run()
     return 0
 

@@ -23,11 +23,11 @@ from PyQt6.QtWidgets import (
     QCheckBox, QGridLayout, QFrame, QScrollArea
 )
 
-APP_NAME = "NexusOS Setup"
-CONFIG_DIR = Path("/etc/nexusos")
+APP_NAME = "Aion Setup"
+CONFIG_DIR = Path("/etc/aion")
 CONFIG_FILE = CONFIG_DIR / "config.json"
 MARKER_FILE = CONFIG_DIR / ".oobe-complete"
-LOCK_FILE = Path("/tmp/nexusos-oobe.lock")
+LOCK_FILE = Path("/tmp/aion-oobe.lock")
 
 BG_PRIMARY = "#121212"
 BG_PANEL = "#1A2238"
@@ -62,7 +62,7 @@ STEP_TITLES = [
     "Ready",
 ]
 
-STR_WELCOME_TITLE = "NexusOS"
+STR_WELCOME_TITLE = "Aion"
 STR_WELCOME_SUBTITLE = "Your system is ready. Let's get started."
 STR_WELCOME_PRESS = "Press Next to begin setup."
 STR_LANG_TITLE = "Select Language"
@@ -97,7 +97,7 @@ STR_SUMMARY_OTA = "OTA Updates"
 STR_SUMMARY_DATA = "Data Collection"
 STR_BTN_NEXT = "Next"
 STR_BTN_BACK = "Back"
-STR_BTN_LAUNCH = "Launch NexusOS"
+STR_BTN_LAUNCH = "Launch Aion"
 STR_BTN_DONE = "Finish"
 
 LOCK_FD = None
@@ -968,6 +968,63 @@ class OOBEWizard(QMainWindow):
         if self.current_step == 0:
             self.welcome_step.title.glowStrength = 0.3 + 0.2 * (0.5 + 0.5 * (self._anim_phase % 6.283 - 3.1416) / 3.1416)
 
+    def _spring_transition(self, from_idx, to_idx):
+        """Spring-damper driven transition (2nd-order underdamped).
+
+        Falls back to the cubic-eased transition on any failure so the
+        existing behaviour is never lost.
+        """
+        current_widget = self.stack.widget(from_idx)
+        next_widget = self.stack.widget(to_idx)
+
+        direction = 1 if to_idx > from_idx else -1
+        w = self.stack.width()
+        h = self.stack.height()
+
+        next_widget.setGeometry(direction * w, 0, w, h)
+        next_widget.show()
+        next_widget.raise_()
+
+        try:
+            from ui.motion.motion_engine import spring_interpolate
+        except ImportError:
+            self._slide_transition(from_idx, to_idx)
+            return
+
+        duration = 0.35
+        steps = max(10, int(duration * 60))
+        try:
+            curve = spring_interpolate(
+                target=1.0, x0=0.0, duration=duration, steps=steps + 1,
+                wn=12.0, zeta=0.7,
+            )
+            curve = [max(0.0, min(1.0, v)) for v in curve]
+        except Exception:
+            self._slide_transition(from_idx, to_idx)
+            return
+
+        state = {"i": 0}
+
+        def tick():
+            i = state["i"]
+            if i >= len(curve):
+                self.stack.setCurrentIndex(to_idx)
+                current_widget.hide()
+                current_widget.setGeometry(0, 0, w, h)
+                next_widget.setGeometry(0, 0, w, h)
+                timer.stop()
+                timer.deleteLater()
+                return
+            f = curve[i]
+            current_widget.setGeometry(-direction * int(w * f), 0, w, h)
+            next_widget.setGeometry(direction * int(w * (1.0 - f)), 0, w, h)
+            state["i"] = i + 1
+
+        timer = QTimer(self)
+        timer.timeout.connect(tick)
+        timer.start(max(4, int(duration * 1000.0 / steps)))
+        self._spring_timer = timer
+
     def _slide_transition(self, from_idx, to_idx):
         current_widget = self.stack.widget(from_idx)
         next_widget = self.stack.widget(to_idx)
@@ -1036,7 +1093,7 @@ class OOBEWizard(QMainWindow):
         if self.current_step == self.total_steps - 1:
             self._populate_summary()
 
-        self._slide_transition(old_step, self.current_step)
+        self._spring_transition(old_step, self.current_step)
         self._update_dots()
         self._update_buttons()
 
@@ -1046,7 +1103,7 @@ class OOBEWizard(QMainWindow):
 
         old_step = self.current_step
         self.current_step -= 1
-        self._slide_transition(old_step, self.current_step)
+        self._spring_transition(old_step, self.current_step)
         self._update_dots()
         self._update_buttons()
 
@@ -1135,6 +1192,13 @@ class OOBEWizard(QMainWindow):
         super().resizeEvent(event)
         w, h = self.width(), self.height()
         self.background.setGeometry(0, 0, w, h)
+        try:
+            from ui.motion.motion_engine import golden_split
+            main_w, _ = golden_split(float(w))
+            side = max(20, int((float(w) - main_w) / 2))
+            self.content_area.layout().setContentsMargins(side, 40, side, 20)
+        except Exception:
+            pass
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key.Key_Escape:
@@ -1169,7 +1233,7 @@ def main():
         sys.exit(1)
 
     app = QApplication(sys.argv)
-    app.setApplicationName("NexusOS OOBE")
+    app.setApplicationName("Aion OOBE")
 
     palette = QPalette()
     palette.setColor(QPalette.ColorRole.Window, QColor(BG_PRIMARY))

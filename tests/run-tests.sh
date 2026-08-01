@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
-# NexusOS Test Runner — executes the Python test suite and prints a summary.
+# Aion Test Runner — executes the Python test suite and prints a summary.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-NEXUSOS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+AION_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 echo "============================================"
-echo "  NexusOS Test Suite"
+echo "  Aion Test Suite"
 echo "============================================"
 echo ""
-echo "Root: $NEXUSOS_ROOT"
+echo "Root: $AION_ROOT"
 echo ""
 
-cd "$NEXUSOS_ROOT"
+cd "$AION_ROOT"
 
-python3 "$SCRIPT_DIR/test-nexusos.py"
+python3 "$SCRIPT_DIR/test-aion.py"
 EXIT_CODE=$?
 
 echo ""

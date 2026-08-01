@@ -1,0 +1,18 @@
+[Unit]
+Description=Aion Game Capture Daemon
+After=graphical.target
+Wants=graphical.target
+PartOf=aion-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/aion/ui/game-capture/game-capture-daemon.py
+Restart=always
+RestartSec=5
+Environment=DISPLAY=:0
+Environment=XDG_RUNTIME_DIR=/run/user/%U
+Environment=HOME=%h
+WorkingDirectory=/opt/aion/ui/game-capture
+
+[Install]
+WantedBy=aion-session.target

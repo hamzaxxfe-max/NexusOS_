@@ -1,0 +1,441 @@
+name: Aion Release Pipeline
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'website/**'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      force_build:
+        description: 'Force ISO build even if tests fail'
+        required: false
+        default: 'false'
+        type: boolean
+      version_override:
+        description: 'Override version tag (e.g. 1.2.3)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  ISO_NAME: aion
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  test:
+    name: Test Suite (174 tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov pytest-xdist
+
+      - name: Run full test suite
+        id: tests
+        run: |
+          set +e
+          python -m pytest tests/ \
+            --tb=short \
+            -q \
+            --junitxml=test-results.xml \
+            2>&1 | tee test-output.txt
+          TEST_EXIT=$?
+          set -e
+
+          TOTAL=$(grep -c "PASSED\|FAILED\|SKIPPED" test-output.txt 2>/dev/null || echo "0")
+          PASSED=$(grep -c "PASSED" test-output.txt 2>/dev/null || echo "0")
+          FAILED=$(grep -c "FAILED" test-output.txt 2>/dev/null || echo "0")
+          SKIPPED=$(grep -c "SKIPPED" test-output.txt 2>/dev/null || echo "0")
+
+          echo "passed=$PASSED" >> "$GITHUB_OUTPUT"
+          echo "failed=$FAILED" >> "$GITHUB_OUTPUT"
+          echo "skipped=$SKIPPED" >> "$GITHUB_OUTPUT"
+          echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
+
+          echo "### Test Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Metric | Count |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Passed | $PASSED |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Failed | $FAILED |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Skipped | $SKIPPED |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Total | $TOTAL |" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$TEST_EXIT" -ne 0 ] && [ "${{ inputs.force_build }}" != "true" ]; then
+            echo "Tests failed ($FAILED failures). Skipping ISO build."
+            echo "### ❌ Tests Failed" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          if [ "$TEST_EXIT" -ne 0 ] && [ "${{ inputs.force_build }}" = "true" ]; then
+            echo "::warning::Tests failed but force_build is enabled. Continuing."
+          fi
+
+          echo "### ✅ Tests Passed" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            test-results.xml
+            test-output.txt
+          retention-days: 14
+
+  preflight:
+    name: Pre-Flight Sanity
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate JSON configs
+        run: |
+          echo "Validating config/aion-config.json..."
+          python -m json.tool config/aion-config.json > /dev/null
+
+          echo "Validating manifest.json..."
+          python -m json.tool deploy/ota/manifest.json > /dev/null
+
+          echo "All JSON configs valid."
+
+      - name: Validate shell scripts syntax
+        run: |
+          ERRORS=0
+          for script in build/scripts/*.sh deploy/github/*.sh core/**/*.sh; do
+            if [ -f "$script" ]; then
+              if ! bash -n "$script"; then
+                echo "SYNTAX ERROR: $script"
+                ERRORS=$((ERRORS + 1))
+              fi
+            fi
+          done
+
+          if [ "$ERRORS" -gt 0 ]; then
+            echo "::error::$ERRORS scripts have syntax errors"
+            exit 1
+          fi
+
+          echo "All shell scripts have valid syntax."
+
+      - name: Validate Python scripts
+        run: |
+          ERRORS=0
+          for script in deploy/ota/ota-updater.py features/*.py; do
+            if [ -f "$script" ]; then
+              if ! python -m py_compile "$script"; then
+                echo "SYNTAX ERROR: $script"
+                ERRORS=$((ERRORS + 1))
+              fi
+            fi
+          done
+
+          if [ "$ERRORS" -gt 0 ]; then
+            echo "::error::$ERRORS Python scripts have syntax errors"
+            exit 1
+          fi
+
+          echo "All Python scripts have valid syntax."
+
+      - name: Check immutable root integrity
+        run: |
+          echo "Verifying core services don't write to /usr..."
+          VIOLATIONS=0
+          for service in core/audio core/input-engine core/security core/network; do
+            if [ -d "$service" ]; then
+              if grep -rn 'write\|cp\|mv\|install\|mkdir.*\/usr' "$service" --include="*.sh" --include="*.py" 2>/dev/null; then
+                echo "VIOLATION: $service attempts to modify /usr"
+                VIOLATIONS=$((VIOLATIONS + 1))
+              fi
+            fi
+          done
+
+          if [ "$VIOLATIONS" -gt 0 ]; then
+            echo "::error::$VIOLATIONS services attempt to modify immutable root"
+            exit 1
+          fi
+
+          echo "Immutable root integrity verified."
+
+      - name: Verify OTA boot counter failsafe
+        run: |
+          echo "Checking ota-updater.py for boot counter failsafe..."
+          if ! grep -q "mark-good\|AB_MANAGER\|boot.*counter\|rollback" deploy/ota/ota-updater.py; then
+            echo "::error::ota-updater.py missing boot counter failsafe (mark-good/rollback)"
+            exit 1
+          fi
+
+          if ! grep -q "systemd-bless-boot\|bless" build/scripts/01-base-system.sh 2>/dev/null; then
+            echo "::warning::01-base-system.sh may not configure systemd-bless-boot for auto-rollback"
+          fi
+
+          echo "Boot counter failsafe verified."
+
+  build-iso:
+    name: Build ISO
+    needs: [test, preflight]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    timeout-minutes: 60
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      iso_path: ${{ steps.build.outputs.iso_path }}
+      iso_size: ${{ steps.build.outputs.iso_size }}
+      sha256: ${{ steps.checksum.outputs.sha256 }}
+      zst_sha256: ${{ steps.compress.outputs.zst_sha256 }}
+      zst_size: ${{ steps.compress.outputs.zst_size }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version_override }}" ]; then
+            VERSION="${{ inputs.version_override }}"
+          elif [ "${{ github.ref_type }}" = "tag" ]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            SHORT_SHA=$(git rev-parse --short HEAD)
+            TIMESTAMP=$(date -u +"%Y%m%d%H%M")
+            VERSION="0.0.0-dev.${TIMESTAMP}.g${SHORT_SHA}"
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "### Version" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`\`\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Aion $VERSION" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`\`\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            archiso \
+            dosfstools \
+            e2fsprogs \
+            libisoburn \
+            mtools \
+            squashfs-tools \
+            xz-utils \
+            zstd
+
+      - name: Cache pacman packages
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/pacman/pkg
+          key: ${{ runner.os }}-pacman-${{ steps.version.outputs.version }}
+          restore-keys: |
+            ${{ runner.os }}-pacman-
+
+      - name: Build ISO
+        id: build
+        run: |
+          chmod +x Aion-Builder.sh
+          chmod +x build/scripts/*.sh
+          sudo ./Aion-Builder.sh "${{ steps.version.outputs.version }}"
+
+          ISO_PATH="build/${ISO_NAME}-${{ steps.version.outputs.version }}.iso"
+          if [ ! -f "$ISO_PATH" ]; then
+            echo "::error::ISO not found at $ISO_PATH"
+            find build/ -name "*.iso" -ls 2>/dev/null
+            exit 1
+          fi
+
+          FILE_SIZE=$(stat -c%s "$ISO_PATH" 2>/dev/null || stat --printf="%s" "$ISO_PATH" 2>/dev/null)
+          FILE_SIZE_MB=$((FILE_SIZE / 1024 / 1024))
+
+          echo "iso_path=$ISO_PATH" >> "$GITHUB_OUTPUT"
+          echo "iso_size=$FILE_SIZE" >> "$GITHUB_OUTPUT"
+          echo "iso_size_mb=$FILE_SIZE_MB" >> "$GITHUB_OUTPUT"
+          echo "### ISO Built" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Path: \`$ISO_PATH\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Size: ${FILE_SIZE_MB} MB" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Generate SHA256 checksum
+        id: checksum
+        run: |
+          ISO_PATH="${{ steps.build.outputs.iso_path }}"
+          SHA256=$(sha256sum "$ISO_PATH" | awk '{print $1}')
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+
+          echo "$SHA256  ${ISO_NAME}-${{ steps.version.outputs.version }}.iso" > build/SHA256SUMS
+
+          echo "### SHA256 Checksum" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`\`\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "$SHA256" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`\`\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Compress ISO with ZSTD
+        id: compress
+        run: |
+          ISO_PATH="${{ steps.build.outputs.iso_path }}"
+          ZST_PATH="${ISO_PATH}.zst"
+          zstd -q -f -3 "$ISO_PATH" -o "$ZST_PATH"
+          if [ ! -f "$ZST_PATH" ]; then
+            echo "::error::ZSTD compression failed"
+            exit 1
+          fi
+          ORIG_SIZE=$(stat -c%s "$ISO_PATH")
+          ZST_SIZE=$(stat -c%s "$ZST_PATH")
+          ZST_SHA=$(sha256sum "$ZST_PATH" | awk '{print $1}')
+          echo "zst_path=$ZST_PATH" >> "$GITHUB_OUTPUT"
+          echo "zst_size=$ZST_SIZE" >> "$GITHUB_OUTPUT"
+          echo "zst_sha256=$ZST_SHA" >> "$GITHUB_OUTPUT"
+          echo "$ZST_SHA  $(basename "$ZST_PATH")" >> build/SHA256SUMS
+
+          echo "### ZSTD Payload" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Size: $((ZST_SIZE / 1024 / 1024)) MB (ISO: $((ORIG_SIZE / 1024 / 1024)) MB)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- SHA256: \`$ZST_SHA\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aion-${{ steps.version.outputs.version }}-iso
+          path: ${{ steps.build.outputs.iso_path }}
+          retention-days: 30
+
+      - name: Upload ZSTD artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aion-${{ steps.version.outputs.version }}-iso-zst
+          path: ${{ steps.compress.outputs.zst_path }}
+          retention-days: 30
+
+      - name: Upload checksum artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aion-${{ steps.version.outputs.version }}-checksums
+          path: build/SHA256SUMS
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Aion ${{ steps.version.outputs.version }}
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.version, 'dev') }}
+          generate_release_notes: true
+          body: |
+            ## Aion ${{ steps.version.outputs.version }}
+
+            ### Downloads
+            - **ISO**: \`aion-${{ steps.version.outputs.version }}.iso\`
+            - **ISO (ZSTD)**: \`aion-${{ steps.version.outputs.version }}.iso.zst\` — smaller OTA payload
+            - **SHA256**: \`SHA256SUMS\`
+
+            ### Installation
+            ```bash
+            # Write ISO to USB
+            sudo dd if=aion-${{ steps.version.outputs.version }}.iso of=/dev/sdX bs=4M status=progress
+
+            # Boot from USB and run installer
+            sudo aion-install
+            ```
+
+            ### Verification
+            ```bash
+            sha256sum -c SHA256SUMS
+            ```
+          files: |
+            ${{ steps.build.outputs.iso_path }}
+            ${{ steps.compress.outputs.zst_path }}
+            build/SHA256SUMS
+
+  update-manifest:
+    name: Update OTA Manifest
+    needs: build-iso
+    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Fetch ISO checksum
+        uses: actions/download-artifact@v4
+        with:
+          name: aion-${{ needs.build-iso.outputs.version || '' }}-checksums
+          path: /tmp/checksums
+        continue-on-error: true
+
+      - name: Update manifest.json
+        run: |
+          VERSION="${{ needs.build-iso.outputs.version }}"
+          SHA256="${{ needs.build-iso.outputs.sha256 }}"
+          TAG="${{ needs.build-iso.outputs.tag }}"
+          REPO="${{ github.repository }}"
+          RELEASE_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${TAG}/aion-${VERSION}.iso"
+          ZST_URL="https://github.com/${REPO}/releases/download/${TAG}/aion-${VERSION}.iso.zst"
+          ZST_SHA="${{ needs.build-iso.outputs.zst_sha256 }}"
+          ZST_SIZE="${{ needs.build-iso.outputs.zst_size }}"
+
+          if [ -z "$VERSION" ]; then
+            echo "::error::build-iso.outputs.version is empty — aborting manifest update"
+            exit 1
+          fi
+
+          if [ -f /tmp/checksums/SHA256SUMS ]; then
+            SHA256=$(head -1 /tmp/checksums/SHA256SUMS | awk '{print $1}')
+          fi
+
+          if [ ! -f deploy/ota/manifest.json ]; then
+            echo '{"latest_version":"","download_url":"","sha256":"","release_date":"","size":0}' > deploy/ota/manifest.json
+          fi
+
+          python3 -c "
+          import json, sys
+          with open('deploy/ota/manifest.json','r') as f: m=json.load(f)
+          old=m.get('latest_version','')
+          m['latest_version']=sys.argv[1]
+          m['download_url']=sys.argv[2]
+          m['sha256']=sys.argv[3]
+          m['release_date']=sys.argv[4]
+          m['size']=int(sys.argv[5]) if sys.argv[5].isdigit() else m.get('size',0)
+          m['zst_url']=sys.argv[6]
+          m['zst_sha256']=sys.argv[7]
+          m['zst_size']=int(sys.argv[8]) if sys.argv[8].isdigit() else 0
+          with open('deploy/ota/manifest.json','w') as f: json.dump(m,f,indent=2); f.write('\n')
+          print('Manifest updated: '+sys.argv[1])
+          " "$VERSION" "$DOWNLOAD_URL" "$SHA256" "$RELEASE_DATE" "${{ needs.build-iso.outputs.iso_size }}" "$ZST_URL" "$ZST_SHA" "$ZST_SIZE"
+
+      - name: Commit manifest update
+        run: |
+          git config user.name "Aion CI"
+          git config user.email "ci@aion.dev"
+          git add deploy/ota/manifest.json
+          if git diff --cached --quiet; then
+            echo "No manifest changes"
+          else
+            git commit -m "chore: update manifest for ${{ needs.build-iso.outputs.version }}"
+            git push origin main
+          fi

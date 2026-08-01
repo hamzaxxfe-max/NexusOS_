@@ -1,6 +1,6 @@
 #!/bin/bash
 set -euo pipefail
-# NexusOS Chameleon Memory Factory — Adaptive ZRAM and memory management
+# Aion Chameleon Memory Factory — Adaptive ZRAM and memory management
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -8,9 +8,9 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-CONFIG_DIR="/etc/nexusos"
+CONFIG_DIR="/etc/aion"
 OUTPUT_FILE="${CONFIG_DIR}/memory-config.json"
-LOG_FILE="/var/log/nexusos/chameleon-memory.log"
+LOG_FILE="/var/log/aion/chameleon-memory.log"
 
 log_info()  { echo -e "${CYAN}[INFO]${NC} $(date '+%H:%M:%S') $*"; echo "[INFO] $(date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG_FILE"; }
 log_warn()  { echo -e "${YELLOW}[WARN]${NC} $(date '+%H:%M:%S') $*"; echo "[WARN] $(date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG_FILE"; }
@@ -207,7 +207,7 @@ report_status() {
 }
 
 main() {
-    log_info "=== NexusOS Chameleon Memory Factory starting ==="
+    log_info "=== Aion Chameleon Memory Factory starting ==="
     local ram_gb
     ram_gb=$(detect_ram_gb)
     log_info "Detected ${ram_gb} GiB RAM"

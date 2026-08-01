@@ -1,0 +1,22 @@
+[Unit]
+Description=Aion Encrypted Telemetry Service (opt-in, local-only)
+Documentation=https://aion.dev/docs/privacy
+After=local-fs.target
+ConditionPathExists=/etc/aion/config.json
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/mkdir -p /var/log/aion/telemetry
+ExecStart=/usr/bin/python3 /usr/lib/aion/telemetry_collector.py --check
+ExecStart=/usr/bin/find /var/log/aion/telemetry -type f -mtime +60 -delete
+ExecStartPre=/usr/bin/mkdir -p /etc/aion
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=aion-telemetry
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/aion /etc/aion
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

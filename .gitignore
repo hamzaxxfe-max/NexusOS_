@@ -1,9 +1,18 @@
-build/
+# Build artifacts (keep build/scripts, deploy/github, workflows tracked)
+build/work/
+build/out/
+build/archiso-git/
+build/*.iso
+build/*.iso.zst
+build/SHA256SUMS
+build/pacman-cache/
 *.iso
 *.iso.xz
+*.iso.zst
 __pycache__/
 *.pyc
 *.pyo
+.pytest_cache/
 .env
 .env.local
 *.log
@@ -12,3 +21,7 @@ node_modules/
 dist/
 *.deb
 *.rpm
+# VM state (keep out of git)
+*.qcow2
+qemu.pid
+OVMF_VARS.fd

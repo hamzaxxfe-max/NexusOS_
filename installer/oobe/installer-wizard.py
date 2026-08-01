@@ -30,11 +30,11 @@ from PyQt6.QtGui import (
     QScreen, QFontMetrics
 )
 
-LOCK_FILE = "/tmp/nexusos-installer.lock"
-LOG_FILE = "/var/log/nexusos/installer.log"
-INSTALL_MEDIA_PATH = "/run/live/media/nexusos"
-NEXUSOS_MOUNT = "/mnt/nexusos"
-GRUB_MARKER = "NexusOS"
+LOCK_FILE = "/tmp/aion-installer.lock"
+LOG_FILE = "/var/log/aion/installer.log"
+INSTALL_MEDIA_PATH = "/run/live/media/aion"
+AION_MOUNT = "/mnt/aion"
+GRUB_MARKER = "Aion"
 
 BG_PRIMARY = "#121212"
 BG_SECONDARY = "#1A2238"
@@ -219,7 +219,7 @@ def is_device_removable(device):
         return False
 
 
-def deploy_nexusos_files(target, steps_callback=None):
+def deploy_aion_files(target, steps_callback=None):
     if steps_callback:
         steps_callback(45, "Copying system files...")
     src = INSTALL_MEDIA_PATH
@@ -227,7 +227,7 @@ def deploy_nexusos_files(target, steps_callback=None):
         src = "/cdrom"
     if not os.path.isdir(src):
         raise RuntimeError(f"Cannot find install media at {INSTALL_MEDIA_PATH} or /cdrom")
-    dest = f"{NEXUSOS_MOUNT}"
+    dest = f"{AION_MOUNT}"
     os.makedirs(dest, exist_ok=True)
     try:
         subprocess.run(
@@ -250,11 +250,11 @@ def deploy_nexusos_files(target, steps_callback=None):
         subprocess.run(["umount", dest], capture_output=True)
         raise RuntimeError(f"Rsync failed: {e}")
     subprocess.run(["umount", dest], capture_output=True)
-    _log(f"Deployed NexusOS files to {target}")
+    _log(f"Deployed Aion files to {target}")
 
 
 def create_btrfs_subvolumes(device):
-    mnt = "/tmp/nexusos-btrfs-setup"
+    mnt = "/tmp/aion-btrfs-setup"
     os.makedirs(mnt, exist_ok=True)
     try:
         subprocess.run(
@@ -273,11 +273,11 @@ def create_btrfs_subvolumes(device):
 
 
 def configure_grub_dualboot(device):
-    grub_cfg = f"""# NexusOS GRUB Configuration (Dual-Boot)
+    grub_cfg = f"""# Aion GRUB Configuration (Dual-Boot)
 GRUB_DEFAULT=saved
 GRUB_TIMEOUT=5
 GRUB_TIMEOUT_STYLE=menu
-GRUB_DISTRIBUTOR="NexusOS"
+GRUB_DISTRIBUTOR="Aion"
 GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"
 GRUB_CMDLINE_LINUX=""
 GRUB_DISABLE_OS_PROBER=false
@@ -286,11 +286,11 @@ GRUB_DISABLE_OS_PROBER=false
 
 
 def configure_grub_standalone(device):
-    grub_cfg = f"""# NexusOS GRUB Configuration (Standalone)
+    grub_cfg = f"""# Aion GRUB Configuration (Standalone)
 GRUB_DEFAULT=0
 GRUB_TIMEOUT=3
 GRUB_TIMEOUT_STYLE=menu
-GRUB_DISTRIBUTOR="NexusOS"
+GRUB_DISTRIBUTOR="Aion"
 GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"
 GRUB_CMDLINE_LINUX=""
 GRUB_DISABLE_OS_PROBER=true
@@ -323,22 +323,22 @@ def install_grub_bios(device):
 
 
 def install_grub_efi(device):
-    efi_mnt = "/tmp/nexusos-efi"
+    efi_mnt = "/tmp/aion-efi"
     os.makedirs(efi_mnt, exist_ok=True)
     try:
         subprocess.run(
             ["mount", f"/dev/{device}1", efi_mnt],
             check=True, capture_output=True, timeout=30
         )
-        os.makedirs(f"{efi_mnt}/EFI/NexusOS", exist_ok=True)
+        os.makedirs(f"{efi_mnt}/EFI/Aion", exist_ok=True)
         subprocess.run(
-            ["cp", "-r", "/boot/efi/EFI/BOOT", f"{efi_mnt}/EFI/NexusOS/"],
+            ["cp", "-r", "/boot/efi/EFI/BOOT", f"{efi_mnt}/EFI/Aion/"],
             capture_output=True, timeout=30
         )
         subprocess.run(
             ["efibootmgr", "--create", "--disk", f"/dev/{device}", "--part", "1",
-             "--loader", "\\EFI\\NexusOS\\BOOT\\BOOTX64.EFI",
-             "--label", "NexusOS", "--verbose"],
+             "--loader", "\\EFI\\Aion\\BOOT\\BOOTX64.EFI",
+             "--label", "Aion", "--verbose"],
             check=True, capture_output=True, timeout=30
         )
         subprocess.run(["umount", efi_mnt], capture_output=True)
@@ -389,7 +389,7 @@ def install_dual_boot(device, partition_size_gb, steps_callback=None):
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"Failed to shrink Windows partition: {e}")
 
-    cb(30, "Creating NexusOS partition...")
+    cb(30, "Creating Aion partition...")
     try:
         subprocess.run(
             ["parted", "-s", f"/dev/{device}", "mkpart", "primary", "ext4",
@@ -405,13 +405,13 @@ def install_dual_boot(device, partition_size_gb, steps_callback=None):
     cb(40, "Formatting Btrfs with zstd:3 compression...")
     try:
         subprocess.run(
-            ["mkfs.btrfs", "-f", "-L", "NexusOS", "-O", "zstd:3", target],
+            ["mkfs.btrfs", "-f", "-L", "Aion", "-O", "zstd:3", target],
             check=True, capture_output=True, timeout=120
         )
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"Btrfs format failed: {e}")
 
-    deploy_nexusos_files(target, steps_callback)
+    deploy_aion_files(target, steps_callback)
 
     cb(70, "Installing kernel and initramfs...")
     try:
@@ -483,7 +483,7 @@ def install_full_replace(device, steps_callback=None):
     try:
         subprocess.run(
             ["sgdisk", "--new=2:0:0", "--typecode=2:8300",
-             "--change-name=2:NexusOS", f"/dev/{device}"],
+             "--change-name=2:Aion", f"/dev/{device}"],
             check=True, capture_output=True, timeout=30
         )
     except subprocess.CalledProcessError as e:
@@ -496,7 +496,7 @@ def install_full_replace(device, steps_callback=None):
             check=True, capture_output=True, timeout=30
         )
         subprocess.run(
-            ["mkfs.btrfs", "-f", "-L", "NexusOS", "-O", "zstd:3", f"/dev/{device}2"],
+            ["mkfs.btrfs", "-f", "-L", "Aion", "-O", "zstd:3", f"/dev/{device}2"],
             check=True, capture_output=True, timeout=120
         )
     except subprocess.CalledProcessError as e:
@@ -505,7 +505,7 @@ def install_full_replace(device, steps_callback=None):
     cb(28, "Creating Btrfs subvolumes...")
     create_btrfs_subvolumes(f"/dev/{device}2")
 
-    deploy_nexusos_files(f"/dev/{device}2", steps_callback)
+    deploy_aion_files(f"/dev/{device}2", steps_callback)
 
     cb(65, "Installing kernel and initramfs...")
     try:
@@ -514,15 +514,15 @@ def install_full_replace(device, steps_callback=None):
         _log(f"Kernel install warning: {e}", "WARN")
 
     cb(70, "Mounting EFI partition and configuring boot...")
-    efi_mnt = "/tmp/nexusos-efi"
+    efi_mnt = "/tmp/aion-efi"
     os.makedirs(efi_mnt, exist_ok=True)
     try:
         subprocess.run(
             ["mount", f"/dev/{device}1", efi_mnt],
             check=True, capture_output=True, timeout=30
         )
-        os.makedirs(f"{efi_mnt}/EFI/NexusOS", exist_ok=True)
-        shutil.copytree("/boot/efi/EFI/BOOT", f"{efi_mnt}/EFI/NexusOS/BOOT",
+        os.makedirs(f"{efi_mnt}/EFI/Aion", exist_ok=True)
+        shutil.copytree("/boot/efi/EFI/BOOT", f"{efi_mnt}/EFI/Aion/BOOT",
                         dirs_exist_ok=True)
         subprocess.run(["umount", efi_mnt], capture_output=True)
     except Exception as e:
@@ -555,27 +555,27 @@ def install_full_replace(device, steps_callback=None):
 
 
 def _install_kernel_to_target(target):
-    os.makedirs(NEXUSOS_MOUNT, exist_ok=True)
+    os.makedirs(AION_MOUNT, exist_ok=True)
     try:
         subprocess.run(
-            ["mount", target, NEXUSOS_MOUNT],
+            ["mount", target, AION_MOUNT],
             check=True, capture_output=True, timeout=30
         )
         subprocess.run(
-            ["chroot", NEXUSOS_MOUNT, "update-initramfs", "-u"],
+            ["chroot", AION_MOUNT, "update-initramfs", "-u"],
             capture_output=True, timeout=120
         )
-        subprocess.run(["umount", NEXUSOS_MOUNT], capture_output=True)
+        subprocess.run(["umount", AION_MOUNT], capture_output=True)
     except subprocess.CalledProcessError as e:
-        subprocess.run(["umount", NEXUSOS_MOUNT], capture_output=True)
+        subprocess.run(["umount", AION_MOUNT], capture_output=True)
         _log(f"Kernel install in chroot failed: {e}", "WARN")
 
 
 def _configure_fstab(target, device, part_num):
-    os.makedirs(NEXUSOS_MOUNT, exist_ok=True)
+    os.makedirs(AION_MOUNT, exist_ok=True)
     try:
         subprocess.run(
-            ["mount", target, NEXUSOS_MOUNT],
+            ["mount", target, AION_MOUNT],
             check=True, capture_output=True, timeout=30
         )
         uuid_result = subprocess.run(
@@ -598,52 +598,52 @@ tmpfs             /tmp       tmpfs  defaults,noatime,mode=1777  0  0
         if efi_uuid:
             fstab_content += f"UUID={efi_uuid}  /boot/efi  vfat  defaults,noatime  0  0\n"
 
-        fstab_path = f"{NEXUSOS_MOUNT}/etc/fstab"
+        fstab_path = f"{AION_MOUNT}/etc/fstab"
         with open(fstab_path, "w") as f:
             f.write(fstab_content)
-        subprocess.run(["umount", NEXUSOS_MOUNT], capture_output=True)
+        subprocess.run(["umount", AION_MOUNT], capture_output=True)
         _log("Configured /etc/fstab")
     except Exception as e:
-        subprocess.run(["umount", NEXUSOS_MOUNT], capture_output=True)
+        subprocess.run(["umount", AION_MOUNT], capture_output=True)
         _log(f"fstab configuration failed: {e}", "ERROR")
         raise
 
 
 def _configure_initramfs(target):
-    os.makedirs(NEXUSOS_MOUNT, exist_ok=True)
+    os.makedirs(AION_MOUNT, exist_ok=True)
     try:
         subprocess.run(
-            ["mount", target, NEXUSOS_MOUNT],
+            ["mount", target, AION_MOUNT],
             check=True, capture_output=True, timeout=30
         )
         subprocess.run(
-            ["chroot", NEXUSOS_MOUNT, "update-initramfs", "-u", "-k", "all"],
+            ["chroot", AION_MOUNT, "update-initramfs", "-u", "-k", "all"],
             capture_output=True, timeout=180
         )
-        subprocess.run(["umount", NEXUSOS_MOUNT], capture_output=True)
+        subprocess.run(["umount", AION_MOUNT], capture_output=True)
         _log("initramfs updated")
     except subprocess.CalledProcessError as e:
-        subprocess.run(["umount", NEXUSOS_MOUNT], capture_output=True)
+        subprocess.run(["umount", AION_MOUNT], capture_output=True)
         _log(f"initramfs update failed: {e}", "WARN")
 
 
 def _configure_system_settings(target):
-    os.makedirs(NEXUSOS_MOUNT, exist_ok=True)
+    os.makedirs(AION_MOUNT, exist_ok=True)
     try:
         subprocess.run(
-            ["mount", target, NEXUSOS_MOUNT],
+            ["mount", target, AION_MOUNT],
             check=True, capture_output=True, timeout=30
         )
-        hostname_path = f"{NEXUSOS_MOUNT}/etc/hostname"
+        hostname_path = f"{AION_MOUNT}/etc/hostname"
         with open(hostname_path, "w") as f:
-            f.write("nexusos\n")
-        hosts_path = f"{NEXUSOS_MOUNT}/etc/hosts"
+            f.write("aion\n")
+        hosts_path = f"{AION_MOUNT}/etc/hosts"
         with open(hosts_path, "w") as f:
-            f.write("127.0.0.1\tlocalhost\n127.0.1.1\tnexusos\n")
-        subprocess.run(["umount", NEXUSOS_MOUNT], capture_output=True)
+            f.write("127.0.0.1\tlocalhost\n127.0.1.1\taion\n")
+        subprocess.run(["umount", AION_MOUNT], capture_output=True)
         _log("System settings configured")
     except Exception as e:
-        subprocess.run(["umount", NEXUSOS_MOUNT], capture_output=True)
+        subprocess.run(["umount", AION_MOUNT], capture_output=True)
         _log(f"System settings failed: {e}", "WARN")
 
 
@@ -829,7 +829,7 @@ class WizardStep(QWidget):
 class InstallerWizard(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("NexusOS Installer")
+        self.setWindowTitle("Aion Installer")
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
             Qt.WindowType.WindowStaysOnTopHint
@@ -895,7 +895,7 @@ class InstallerWizard(QMainWindow):
         icon_label.setStyleSheet(f"color: {ACCENT};")
         layout.addWidget(icon_label)
 
-        title = QLabel("NexusOS Installer")
+        title = QLabel("Aion Installer")
         title.setFont(QFont("Segoe UI", int(SCREEN_W * 0.01), QFont.Weight.DemiBold))
         title.setStyleSheet(f"color: {TEXT_PRIMARY};")
         layout.addWidget(title)
@@ -979,7 +979,7 @@ class InstallerWizard(QMainWindow):
 
         step.main_layout.addSpacing(int(SCREEN_H * 0.01))
 
-        glow = GlowLabel("NexusOS")
+        glow = GlowLabel("Aion")
         glow.setAlignment(Qt.AlignmentFlag.AlignCenter)
         glow.setFont(QFont("Segoe UI", int(SCREEN_W * 0.055), QFont.Weight.Bold))
         glow.setMinimumHeight(int(SCREEN_H * 0.1))
@@ -1052,37 +1052,37 @@ class InstallerWizard(QMainWindow):
         scroll.setMaximumHeight(int(SCREEN_H * 0.5))
 
         license_text = QLabel(
-            "NEXUSOS GAMING EDITION \u2014 PROPRIETARY LICENSE AGREEMENT\n\n"
-            "Copyright \u00A9 2024-2026 NexusOS Project. All rights reserved.\n\n"
-            "IMPORTANT: READ THIS AGREEMENT CAREFULLY BEFORE USING NEXUSOS.\n\n"
+            "AION GAMING EDITION \u2014 PROPRIETARY LICENSE AGREEMENT\n\n"
+            "Copyright \u00A9 2024-2026 Aion Project. All rights reserved.\n\n"
+            "IMPORTANT: READ THIS AGREEMENT CAREFULLY BEFORE USING AION.\n\n"
             "1. GRANT OF LICENSE\n"
-            "NexusOS Project grants you a non-exclusive, non-transferable license to use "
-            "NexusOS Gaming Edition on a single personal computer for evaluation purposes "
+            "Aion Project grants you a non-exclusive, non-transferable license to use "
+            "Aion Gaming Edition on a single personal computer for evaluation purposes "
             "during the trial period.\n\n"
             "2. TRIAL EDITION\n"
             "The Safe Trial Edition may be used from a USB drive for up to 30 days without "
             "activation. After the trial period, certain features may be restricted.\n\n"
             "3. RESTRICTIONS\n"
-            "You may not: (a) reverse engineer, decompile, or disassemble NexusOS; "
-            "(b) distribute copies to third parties; (c) use NexusOS for commercial "
+            "You may not: (a) reverse engineer, decompile, or disassemble Aion; "
+            "(b) distribute copies to third parties; (c) use Aion for commercial "
             "purposes without a commercial license; (d) remove any proprietary notices.\n\n"
             "4. GAMING FEATURES\n"
-            "NexusOS includes optimized drivers, Wine/Proton integration, and gaming "
+            "Aion includes optimized drivers, Wine/Proton integration, and gaming "
             "utilities. These features are provided as-is without warranty of compatibility "
             "with specific games or hardware configurations.\n\n"
             "5. PRIVACY\n"
-            "NexusOS does not collect personal data without explicit consent. Telemetry "
+            "Aion does not collect personal data without explicit consent. Telemetry "
             "may be enabled optionally and can be disabled at any time.\n\n"
             "6. OPEN SOURCE COMPONENTS\n"
-            "NexusOS includes open-source software licensed under GPL, MIT, Apache 2.0, "
+            "Aion includes open-source software licensed under GPL, MIT, Apache 2.0, "
             "and other compatible licenses. Source code is available at "
-            "https://github.com/nexusos/sources.\n\n"
+            "https://github.com/aion/sources.\n\n"
             "7. WARRANTY DISCLAIMER\n"
-            "NEXUSOS IS PROVIDED \"AS IS\" WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, "
+            "AION IS PROVIDED \"AS IS\" WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, "
             "INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, "
             "AND NONINFRINGEMENT.\n\n"
             "8. LIMITATION OF LIABILITY\n"
-            "IN NO EVENT SHALL NEXUSOS PROJECT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, "
+            "IN NO EVENT SHALL AION PROJECT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, "
             "SPECIAL, OR CONSEQUENTIAL DAMAGES.\n\n"
             "9. GOVERNING LAW\n"
             "This agreement is governed by the laws of the applicable jurisdiction.\n\n"
@@ -1202,7 +1202,7 @@ class InstallerWizard(QMainWindow):
         header.setStyleSheet(f"color: {TEXT_PRIMARY};")
         step.main_layout.addWidget(header)
 
-        desc = QLabel("Choose how you want to deploy NexusOS on your system.")
+        desc = QLabel("Choose how you want to deploy Aion on your system.")
         desc.setFont(QFont("Segoe UI", int(SCREEN_W * 0.011)))
         desc.setStyleSheet(f"color: {TEXT_SECONDARY};")
         step.main_layout.addWidget(desc)
@@ -1232,7 +1232,7 @@ class InstallerWizard(QMainWindow):
         title_safe.setStyleSheet(f"color: {ACCENT}; background: transparent; border: none;")
         safe_layout.addWidget(title_safe)
 
-        desc_safe = QLabel("Try NexusOS from USB without modifying your system.\nTest everything risk-free.")
+        desc_safe = QLabel("Try Aion from USB without modifying your system.\nTest everything risk-free.")
         desc_safe.setAlignment(Qt.AlignmentFlag.AlignCenter)
         desc_safe.setFont(QFont("Segoe UI", int(SCREEN_W * 0.01)))
         desc_safe.setStyleSheet(f"color: {TEXT_SECONDARY}; background: transparent; border: none;")
@@ -1277,7 +1277,7 @@ class InstallerWizard(QMainWindow):
         title_full.setStyleSheet(f"color: {ACCENT}; background: transparent; border: none;")
         full_layout.addWidget(title_full)
 
-        desc_full = QLabel("Install NexusOS permanently. Choose dual-boot or\nreplace your OS entirely.")
+        desc_full = QLabel("Install Aion permanently. Choose dual-boot or\nreplace your OS entirely.")
         desc_full.setAlignment(Qt.AlignmentFlag.AlignCenter)
         desc_full.setFont(QFont("Segoe UI", int(SCREEN_W * 0.01)))
         desc_full.setStyleSheet(f"color: {TEXT_SECONDARY}; background: transparent; border: none;")
@@ -1346,7 +1346,7 @@ class InstallerWizard(QMainWindow):
         header.setStyleSheet(f"color: {TEXT_PRIMARY};")
         step.main_layout.addWidget(header)
 
-        desc = QLabel("Choose how to install NexusOS on your disk.")
+        desc = QLabel("Choose how to install Aion on your disk.")
         desc.setFont(QFont("Segoe UI", int(SCREEN_W * 0.011)))
         desc.setStyleSheet(f"color: {TEXT_SECONDARY};")
         step.main_layout.addWidget(desc)
@@ -1377,7 +1377,7 @@ class InstallerWizard(QMainWindow):
         dual_layout.addWidget(title_dual)
 
         desc_dual = QLabel(
-            "Shrink existing partition, install NexusOS alongside Windows.\n"
+            "Shrink existing partition, install Aion alongside Windows.\n"
             "Both operating systems will be accessible at boot."
         )
         desc_dual.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -1410,7 +1410,7 @@ class InstallerWizard(QMainWindow):
         replace_layout.addWidget(title_replace)
 
         desc_replace = QLabel(
-            "Erase entire disk. NexusOS becomes your only operating system.\n"
+            "Erase entire disk. Aion becomes your only operating system.\n"
             "All data on the target disk will be permanently destroyed."
         )
         desc_replace.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -1463,7 +1463,7 @@ class InstallerWizard(QMainWindow):
         self.disk_header.setStyleSheet(f"color: {TEXT_PRIMARY};")
         step.main_layout.addWidget(self.disk_header)
 
-        self.disk_desc = QLabel("Select the disk where NexusOS will be installed.")
+        self.disk_desc = QLabel("Select the disk where Aion will be installed.")
         self.disk_desc.setFont(QFont("Segoe UI", int(SCREEN_W * 0.011)))
         self.disk_desc.setStyleSheet(f"color: {TEXT_SECONDARY};")
         step.main_layout.addWidget(self.disk_desc)
@@ -1567,7 +1567,7 @@ class InstallerWizard(QMainWindow):
         """)
         dual_opt_layout = QVBoxLayout(self.dual_boot_options)
 
-        size_label = QLabel("Partition Size for NexusOS:")
+        size_label = QLabel("Partition Size for Aion:")
         size_label.setFont(QFont("Segoe UI", int(SCREEN_W * 0.011), QFont.Weight.Bold))
         size_label.setStyleSheet(f"color: {TEXT_PRIMARY}; background: transparent; border: none;")
         dual_opt_layout.addWidget(size_label)
@@ -1663,10 +1663,10 @@ class InstallerWizard(QMainWindow):
             self.disk_desc.setText("Choose the USB drive to use for the live session.")
         elif self.install_type == "full_replace":
             self.disk_header.setText("Select Target Disk (DANGER)")
-            self.disk_desc.setText("Choose the disk to ERASE and install NexusOS. ALL DATA WILL BE LOST.")
+            self.disk_desc.setText("Choose the disk to ERASE and install Aion. ALL DATA WILL BE LOST.")
         else:
             self.disk_header.setText("Select Target Disk")
-            self.disk_desc.setText("Choose the disk where NexusOS will be installed alongside Windows.")
+            self.disk_desc.setText("Choose the disk where Aion will be installed alongside Windows.")
 
         for disk in self.detected_disks:
             card = CardWidget()
@@ -1795,7 +1795,7 @@ class InstallerWizard(QMainWindow):
 
         nav = self._create_nav_bar()
         nav["back_btn"].clicked.connect(lambda: self._go_to_step(5))
-        nav["next_btn"].setText("\u25B6  Install NexusOS")
+        nav["next_btn"].setText("\u25B6  Install Aion")
         nav["next_btn"].setStyleSheet(f"""
             QPushButton {{
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
@@ -1878,12 +1878,12 @@ class InstallerWizard(QMainWindow):
     def _create_step_progress(self):
         step = WizardStep()
 
-        self.progress_header = QLabel("Installing NexusOS")
+        self.progress_header = QLabel("Installing Aion")
         self.progress_header.setFont(QFont("Segoe UI", int(SCREEN_W * 0.02), QFont.Weight.Bold))
         self.progress_header.setStyleSheet(f"color: {TEXT_PRIMARY};")
         step.main_layout.addWidget(self.progress_header)
 
-        self.progress_desc = QLabel("Please wait while NexusOS is being installed...")
+        self.progress_desc = QLabel("Please wait while Aion is being installed...")
         self.progress_desc.setFont(QFont("Segoe UI", int(SCREEN_W * 0.011)))
         self.progress_desc.setStyleSheet(f"color: {TEXT_SECONDARY};")
         step.main_layout.addWidget(self.progress_desc)
@@ -1962,7 +1962,7 @@ class InstallerWizard(QMainWindow):
         complete_title.setStyleSheet(f"color: {SUCCESS}; background: transparent; border: none;")
         complete_layout.addWidget(complete_title)
 
-        complete_msg = QLabel("Remove the installation media and restart your computer.\nYour NexusOS system is ready to use!")
+        complete_msg = QLabel("Remove the installation media and restart your computer.\nYour Aion system is ready to use!")
         complete_msg.setAlignment(Qt.AlignmentFlag.AlignCenter)
         complete_msg.setFont(QFont("Segoe UI", int(SCREEN_W * 0.011)))
         complete_msg.setStyleSheet(f"color: {TEXT_SECONDARY}; background: transparent; border: none;")
@@ -2162,7 +2162,7 @@ class InstallerWizard(QMainWindow):
             QMessageBox.critical(
                 self, "Installation Failed",
                 f"An error occurred during installation:\n\n{message}\n\n"
-                "Check /var/log/nexusos/installer.log for details."
+                "Check /var/log/aion/installer.log for details."
             )
             _log(f"Installation failed: {message}", "ERROR")
 
@@ -2251,11 +2251,11 @@ def main():
     except Exception:
         pass
 
-    _log("NexusOS Installer starting")
+    _log("Aion Installer starting")
 
     app = QApplication(sys.argv)
-    app.setApplicationName("NexusOS Installer")
-    app.setOrganizationName("NexusOS")
+    app.setApplicationName("Aion Installer")
+    app.setOrganizationName("Aion")
 
     app.setStyleSheet(f"""
         * {{

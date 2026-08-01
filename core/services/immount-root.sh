@@ -1,14 +1,14 @@
 #!/bin/bash
 set -euo pipefail
 
-NEXUSOS_ROOT_MOUNT="/mnt/nexusos-root"
-OVERLAY_UPPER="/run/nexusos/overlay-upper"
-OVERLAY_WORK="/run/nexusos/overlay-work"
-OVERLAY_MERGED="/run/nexusos/overlay-merged"
+AION_ROOT_MOUNT="/mnt/aion-root"
+OVERLAY_UPPER="/run/aion/overlay-upper"
+OVERLAY_WORK="/run/aion/overlay-work"
+OVERLAY_MERGED="/run/aion/overlay-merged"
 BTRFS_DEVID=""
-MAINTENANCE_FLAG="/etc/nexusos/.maintenance-mode"
-LOG_FILE="/var/log/nexusos/immutable-root.log"
-ROLLBACK_FLAG="/etc/nexusos/.rollback-requested"
+MAINTENANCE_FLAG="/etc/aion/.maintenance-mode"
+LOG_FILE="/var/log/aion/immutable-root.log"
+ROLLBACK_FLAG="/etc/aion/.rollback-requested"
 
 log() {
     local level="$1"
@@ -93,7 +93,7 @@ create_subvolumes() {
     root_dev=$(findmnt -n -o SOURCE /)
     local mount_opts="rw,compress=zstd:3,noatime,ssd,discard=async"
 
-    mkdir -p "${NEXUSOS_ROOT_MOUNT}"
+    mkdir -p "${AION_ROOT_MOUNT}"
 
     local existing_subs
     existing_subs=$(btrfs subvolume list "${root_dev}" 2>/dev/null || true)
@@ -102,16 +102,16 @@ create_subvolumes() {
         log_info "Subvolume @root already exists"
     else
         log_info "Creating subvolume @root"
-        btrfs subvolume create "${NEXUSOS_ROOT_MOUNT}/@root"
+        btrfs subvolume create "${AION_ROOT_MOUNT}/@root"
     fi
 
-    local subvols=("@home" "@etc-nexusos" "@var-log" "@tmp" "@root")
+    local subvols=("@home" "@etc-aion" "@var-log" "@tmp" "@root")
     for subvol in "${subvols[@]}"; do
         if echo "${existing_subs}" | grep -q " ${subvol}$"; then
             log_info "Subvolume ${subvol} already exists"
         else
             log_info "Creating subvolume ${subvol}"
-            btrfs subvolume create "${NEXUSOS_ROOT_MOUNT}/${subvol}"
+            btrfs subvolume create "${AION_ROOT_MOUNT}/${subvol}"
         fi
     done
 }
@@ -121,14 +121,14 @@ populate_root_subvolume() {
     root_dev=$(findmnt -n -o SOURCE /)
 
     log_info "Populating @root subvolume with current root contents"
-    btrfs subvolume set-default "$(btrfs subvolume show "${NEXUSOS_ROOT_MOUNT}/@root" | grep 'Subvolume ID' | awk '{print $3}')" "${root_dev}" 2>/dev/null || true
+    btrfs subvolume set-default "$(btrfs subvolume show "${AION_ROOT_MOUNT}/@root" | grep 'Subvolume ID' | awk '{print $3}')" "${root_dev}" 2>/dev/null || true
 
-    local temp_mount="/tmp/nexusos-populate-$$"
+    local temp_mount="/tmp/aion-populate-$$"
     mkdir -p "${temp_mount}"
     mount -t btrfs -o rw,compress=zstd:3,noatime "${root_dev}" "${temp_mount}"
 
     if [ ! -f "${temp_mount}/@root/.populated" ]; then
-        rsync -a --exclude='/@root/*' --exclude='/@home/*' --exclude='/@etc-nexusos/*' \
+        rsync -a --exclude='/@root/*' --exclude='/@home/*' --exclude='/@etc-aion/*' \
             --exclude='/@var-log/*' --exclude='/@tmp/*' --exclude='/boot/*' \
             "${temp_mount}/" "${temp_mount}/@root/" 2>/dev/null || \
             cp -a "${temp_mount}/"[!.]* "${temp_mount}/@root/" 2>/dev/null || true
@@ -145,11 +145,11 @@ set_readonly_root() {
     root_dev=$(findmnt -n -o SOURCE /)
 
     local subvol_id
-    subvol_id=$(btrfs subvolume show "${NEXUSOS_ROOT_MOUNT}/@root" | grep 'Subvolume ID' | awk '{print $3}')
+    subvol_id=$(btrfs subvolume show "${AION_ROOT_MOUNT}/@root" | grep 'Subvolume ID' | awk '{print $3}')
 
     log_info "Setting @root subvolume to read-only (id=${subvol_id})"
     btrfs subvolume set-default "${subvol_id}" "${root_dev}"
-    chattr +i "${NEXUSOS_ROOT_MOUNT}/@root" 2>/dev/null || true
+    chattr +i "${AION_ROOT_MOUNT}/@root" 2>/dev/null || true
 }
 
 setup_overlay_dirs() {
@@ -170,20 +170,20 @@ setup_overlay_dirs() {
 setup_systemd_tmpfiles() {
     log_info "Configuring systemd-tmpfiles for /tmp and /var/tmp"
 
-    local tmpfiles_conf="/etc/tmpfiles.d/nexusos-immutable.conf"
+    local tmpfiles_conf="/etc/tmpfiles.d/aion-immutable.conf"
     mkdir -p /etc/tmpfiles.d
 
     cat > "${tmpfiles_conf}" << 'TMPFILES_EOF'
-# NexusOS Immutable Root - Temporary file configuration
+# Aion Immutable Root - Temporary file configuration
 # Type Path Mode User Group Age Argument
 d /tmp 1777 root root 10d -
 d /var/tmp 1777 root root 30d -
-d /run/nexusos 0755 root root - -
-d /run/nexusos/overlay-upper 0755 root root - -
-d /run/nexusos/overlay-work 0755 root root - -
-d /run/nexusos/overlay-merged 0755 root root - -
-d /var/log/nexusos 0755 root root - -
-d /etc/nexusos 0755 root root - -
+d /run/aion 0755 root root - -
+d /run/aion/overlay-upper 0755 root root - -
+d /run/aion/overlay-work 0755 root root - -
+d /run/aion/overlay-merged 0755 root root - -
+d /var/log/aion 0755 root root - -
+d /etc/aion 0755 root root - -
 TMPFILES_EOF
 
     log_info "tmpfiles configuration written to ${tmpfiles_conf}"
@@ -195,20 +195,20 @@ create_systemd_services() {
     local service_dir="/etc/systemd/system"
     mkdir -p "${service_dir}"
 
-    cat > "${service_dir}/nexusos-overlay.service" << 'SERVICE_EOF'
+    cat > "${service_dir}/aion-overlay.service" << 'SERVICE_EOF'
 [Unit]
-Description=NexusOS Immutable Root Overlay Setup
+Description=Aion Immutable Root Overlay Setup
 DefaultDependencies=no
 After=local-fs.target
 Before=systemd-tmpfiles-setup.service
-RequiresMountsFor=/run/nexusos
+RequiresMountsFor=/run/aion
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/lib/nexusos/immount-root.sh --mount-overlay
-ExecStop=/usr/lib/nexusos/immount-root.sh --unmount-overlay
-ExecReload=/usr/lib/nexusos/immount-root.sh --remount-overlay
+ExecStart=/usr/lib/aion/immount-root.sh --mount-overlay
+ExecStop=/usr/lib/aion/immount-root.sh --unmount-overlay
+ExecReload=/usr/lib/aion/immount-root.sh --remount-overlay
 TimeoutStartSec=60
 TimeoutStopSec=30
 
@@ -216,20 +216,20 @@ TimeoutStopSec=30
 WantedBy=local-fs.target
 SERVICE_EOF
 
-    cat > "${service_dir}/nexusos-validate.service" << 'VALIDATE_EOF'
+    cat > "${service_dir}/aion-validate.service" << 'VALIDATE_EOF'
 [Unit]
-Description=NexusOS Btrfs Filesystem Validation
-After=nexusos-overlay.service
-Before=nexusos-games.target
+Description=Aion Btrfs Filesystem Validation
+After=aion-overlay.service
+Before=aion-games.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/lib/nexusos/immount-root.sh --validate
-ExecStartPre=/usr/lib/nexusos/immount-root.sh --check-maintenance
+ExecStart=/usr/lib/aion/immount-root.sh --validate
+ExecStartPre=/usr/lib/aion/immount-root.sh --check-maintenance
 TimeoutStartSec=120
 
 [Install]
-WantedBy=nexusos-games.target
+WantedBy=aion-games.target
 VALIDATE_EOF
 
     systemctl daemon-reload
@@ -241,9 +241,9 @@ mount_overlay() {
     root_dev=$(findmnt -n -o SOURCE /)
 
     local root_subvol_id
-    root_subvol_id=$(btrfs subvolume show "${NEXUSOS_ROOT_MOUNT}/@root" | grep 'Subvolume ID' | awk '{print $3}')
+    root_subvol_id=$(btrfs subvolume show "${AION_ROOT_MOUNT}/@root" | grep 'Subvolume ID' | awk '{print $3}')
 
-    local root_lower="${NEXUSOS_ROOT_MOUNT}/@root"
+    local root_lower="${AION_ROOT_MOUNT}/@root"
 
     setup_overlay_dirs
 
@@ -325,7 +325,7 @@ perform_rollback() {
     log_info "Resetting default subvolume to top-level"
     btrfs subvolume set-default 0 "${root_dev}"
 
-    chattr -i "${NEXUSOS_ROOT_MOUNT}/@root" 2>/dev/null || true
+    chattr -i "${AION_ROOT_MOUNT}/@root" 2>/dev/null || true
 
     log_info "Rollback complete. Root is now mutable."
     log_info "Reboot recommended to apply changes."
@@ -343,7 +343,7 @@ disable_maintenance_mode() {
 }
 
 print_status() {
-    echo "=== NexusOS Immutable Root Status ==="
+    echo "=== Aion Immutable Root Status ==="
     echo ""
 
     local root_dev
@@ -363,7 +363,7 @@ print_status() {
     fi
 
     local root_subvol
-    root_subvol=$(btrfs subvolume show "${NEXUSOS_ROOT_MOUNT}/@root" 2>/dev/null | grep 'Name' | awk '{print $2}' || echo "unknown")
+    root_subvol=$(btrfs subvolume show "${AION_ROOT_MOUNT}/@root" 2>/dev/null | grep 'Name' | awk '{print $2}' || echo "unknown")
     echo "Root subvolume: ${root_subvol}"
 
     local default_subvol
@@ -379,7 +379,7 @@ usage() {
     cat << EOF
 Usage: $(basename "$0") [OPTION]
 
-NexusOS Immutable Root Setup Script
+Aion Immutable Root Setup Script
 
 Options:
   --setup           First-boot setup: create subvolumes, configure overlay
@@ -402,7 +402,7 @@ main() {
 
     case "${1:-}" in
         --setup)
-            log_info "=== NexusOS Immutable Root First Boot Setup ==="
+            log_info "=== Aion Immutable Root First Boot Setup ==="
             check_maintenance_mode || exit 0
             check_rollback
             detect_root_device

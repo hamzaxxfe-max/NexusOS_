@@ -1,0 +1,14 @@
+[Unit]
+Description=Aion GPU Auto-Detection
+After=local-fs.target
+Before=display-manager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/gpu-autodetect.sh
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,17 @@
+[Unit]
+Description=Aion Dynamic Performance Engine
+After=local-fs.target aion-gpu-profiler.service aion-chameleon-memory.service aion-storage-optimizer.service
+Wants=local-fs.target
+ConditionPathExists=/etc/aion
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/aion/performance/engine/aion-performance-engine.py
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=aion-performance-engine
+Environment=AION_CONFIG_DIR=/etc/aion
+
+[Install]
+WantedBy=multi-user.target

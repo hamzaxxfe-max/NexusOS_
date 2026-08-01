@@ -1,0 +1,14 @@
+[Unit]
+Description=Aion Chameleon Memory Factory
+After=local-fs.target
+Wants=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash /opt/aion/core/hardware-adapter/memory/chameleon-memory.sh
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

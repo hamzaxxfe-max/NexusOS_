@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NexusOS Live Wallpaper Selector — Browse, preview, and apply live wallpapers."""
+"""Aion Live Wallpaper Selector — Browse, preview, and apply live wallpapers."""
 
 import json
 import os
@@ -44,10 +44,10 @@ TEXT_PRIMARY = "#FFFFFF"
 TEXT_SECONDARY = "#B0B0B0"
 PANEL_BORDER = "#2A3550"
 
-CONFIG_PATH = Path("/etc/nexusos/live-wallpaper.json")
+CONFIG_PATH = Path("/etc/aion/live-wallpaper.json")
 DEFAULT_CONFIG = {
-    "wallpaper_dir": "/usr/share/nexusos/live-wallpapers",
-    "user_wallpaper_dir": "~/Videos/NexusOS-Wallpapers",
+    "wallpaper_dir": "/usr/share/aion/live-wallpapers",
+    "user_wallpaper_dir": "~/Videos/Aion-Wallpapers",
     "current_wallpaper": "",
 }
 
@@ -143,7 +143,7 @@ class ThumbnailLoader(QThread):
         self._running = True
 
     def run(self):
-        thumb_dir = Path(tempfile.gettempdir()) / "nexusos-wallpaper-thumbs"
+        thumb_dir = Path(tempfile.gettempdir()) / "aion-wallpaper-thumbs"
         thumb_dir.mkdir(exist_ok=True)
         for filepath, category in self._tasks:
             if not self._running:
@@ -254,7 +254,7 @@ class WallpaperSelector(QMainWindow):
         self._current_category = "All"
         self._selected_path = self._config.get("current_wallpaper", "")
         self._cards = []
-        self.setWindowTitle("NexusOS Live Wallpaper Selector")
+        self.setWindowTitle("Aion Live Wallpaper Selector")
         self.setMinimumSize(self._scale.s(900), self._scale.s(600))
         self._build_ui()
         self._load_wallpapers()
@@ -535,7 +535,7 @@ class WallpaperSelector(QMainWindow):
 
     def _signal_daemon(self):
         try:
-            pid_file = Path("/tmp/nexusos-live-wallpaper.pid")
+            pid_file = Path("/tmp/aion-live-wallpaper.pid")
             if pid_file.exists():
                 pid = int(pid_file.read_text().strip())
                 os.kill(pid, signal.SIGHUP)
@@ -545,7 +545,7 @@ class WallpaperSelector(QMainWindow):
 
 def main():
     app = QApplication.instance() or QApplication(sys.argv)
-    app.setApplicationName("NexusOS Live Wallpaper Selector")
+    app.setApplicationName("Aion Live Wallpaper Selector")
     selector = WallpaperSelector()
     selector.show()
     sys.exit(app.exec())

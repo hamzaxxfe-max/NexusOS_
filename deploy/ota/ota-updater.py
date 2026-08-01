@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NexusOS OTA Update System."""
+"""Aion OTA Update System."""
 
 import argparse
 import hashlib
@@ -20,20 +20,27 @@ except ImportError:
     print("Error: 'packaging' module required. Install with: pip install packaging", file=sys.stderr)
     sys.exit(1)
 
-CONFIG_PATH = Path("/etc/nexusos/config.json")
-MANIFEST_URL = "https://raw.githubusercontent.com/username/nexusos/main/manifest.json"
-MANIFEST_CACHE = Path("/var/cache/nexusos/manifest.json")
-LOG_DIR = Path("/var/log/nexusos")
+try:
+    from ota_compression import decompress as _decompress_archive
+except ImportError:
+    _decompress_archive = None
+
+CONFIG_PATH = Path("/etc/aion/config.json")
+MANIFEST_URL = "https://raw.githubusercontent.com/username/aion/main/manifest.json"
+MANIFEST_CACHE = Path("/var/cache/aion/manifest.json")
+LOG_DIR = Path("/var/log/aion")
 LOG_FILE = LOG_DIR / "ota-updater.log"
-UPDATE_MARKER = Path("/var/run/nexusos-update-ready")
-NOTIFICATION_SENT = Path("/var/lib/nexusos/.notification-sent")
-BTRFS_MOUNT = Path("/mnt/nexusos-update")
+UPDATE_MARKER = Path("/var/run/aion-update-ready")
+NOTIFICATION_SENT = Path("/var/lib/aion/.notification-sent")
+BTRFS_MOUNT = Path("/mnt/aion-update")
 SNAPSHOT_ROOT = Path("/")
 MAX_RETRIES = 3
 RETRY_DELAY = 5
 CURL_TIMEOUT = 300
+AB_MANAGER = Path("/usr/bin/aion-ab-manager")
+AB_STATE = Path("/etc/aion-ab-state")
 
-logger = logging.getLogger("nexusos-ota")
+logger = logging.getLogger("aion-ota")
 
 
 def setup_logging() -> None:
@@ -49,6 +56,96 @@ def setup_logging() -> None:
     logger.addHandler(file_handler)
     logger.addHandler(console_handler)
     logger.setLevel(logging.DEBUG)
+
+
+# ── A/B Slot Management ──────────────────────────────────────────────
+
+def get_active_slot() -> str:
+    """Get the current active boot slot (A or B)."""
+    if AB_MANAGER.exists():
+        try:
+            result = subprocess.run(
+                [str(AB_MANAGER), "status"],
+                capture_output=True, text=True, timeout=10,
+            )
+            for line in result.stdout.strip().split("\n"):
+                if line.startswith("Active slot:"):
+                    slot = line.split(":")[-1].strip()
+                    if slot in ("A", "B"):
+                        return slot
+        except (subprocess.TimeoutExpired, Exception) as e:
+            logger.warning("Failed to get active slot via manager: %s", e)
+
+    # Fallback: parse BLS entries
+    entries_dir = Path("/boot/loader/entries")
+    for entry in entries_dir.glob("aion-*.conf"):
+        try:
+            content = entry.read_text()
+            if "active" in content:
+                if "Slot A" in content:
+                    return "A"
+                elif "Slot B" in content:
+                    return "B"
+        except Exception:
+            continue
+
+    return "A"
+
+
+def get_inactive_slot() -> str:
+    """Get the inactive boot slot (target for updates)."""
+    return "B" if get_active_slot() == "A" else "A"
+
+
+def get_slot_subvol(slot: str) -> str:
+    """Get the Btrfs subvolume for a given slot."""
+    return f"@{slot}"
+
+
+def set_boot_slot(slot: str) -> bool:
+    """Switch the bootloader to boot from the given slot."""
+    logger.info("Setting boot slot to %s", slot)
+
+    if AB_MANAGER.exists():
+        try:
+            result = subprocess.run(
+                [str(AB_MANAGER), "switch"],
+                capture_output=True, text=True, timeout=30,
+            )
+            if result.returncode == 0:
+                logger.info("Boot slot switched via A/B manager")
+                return True
+        except (subprocess.TimeoutExpired, Exception) as e:
+            logger.warning("A/B manager switch failed: %s", e)
+
+    # Fallback: manually update BLS entries
+    entries_dir = Path("/boot/loader/entries")
+    loader_conf = Path("/boot/loader/loader.conf")
+
+    try:
+        for entry in entries_dir.glob("aion-*.conf"):
+            content = entry.read_text()
+            if f"Slot {slot}" in content and "active" not in content:
+                content = content.replace(f"Slot {slot}", f"Slot {slot} (active)")
+                entry.write_text(content)
+            elif "active" in content and f"Slot {slot}" not in content:
+                content = content.replace(" (active)", "")
+                entry.write_text(content)
+
+        # Update default in loader.conf
+        loader_content = loader_conf.read_text()
+        loader_content = loader_content.replace(
+            "default aion-a.conf" if slot == "B" else "default aion-b.conf",
+            f"default aion-{slot.lower()}.conf",
+        )
+        loader_conf.write_text(loader_content)
+
+        logger.info("BLS entries updated for slot %s", slot)
+        return True
+
+    except Exception as e:
+        logger.error("Failed to update BLS entries: %s", e)
+        return False
 
 
 def load_system_config() -> dict:
@@ -197,6 +294,56 @@ def verify_checksum(file_path: Path, expected_sha256: str) -> bool:
     return False
 
 
+_MAGIC_ZST = b"\x28\xb5\x2f\xfd"
+_MAGIC_LZ4 = b"\x04\x22\x4d\x18"
+_MAGIC_XZ = b"\xfd\x37\x7a\x58\x5a\x00"
+
+
+def _detect_archive_suffix(path: Path) -> str:
+    """Return a real archive suffix based on magic bytes, not file name."""
+    try:
+        with open(path, "rb") as f:
+            head = f.read(6)
+    except OSError:
+        return path.suffix.lower()
+    if head.startswith(_MAGIC_ZST):
+        return ".zst"
+    if head.startswith(_MAGIC_LZ4):
+        return ".lz4"
+    if head.startswith(_MAGIC_XZ):
+        return ".xz"
+    return path.suffix.lower()
+
+
+def prepare_downloaded_file(path: Path) -> Path:
+    """Decompress a downloaded archive in place (ZSTD/LZ4/XZ) before use.
+
+    Detects archives by magic bytes, so it also handles payloads that were
+    stored with a misleading file name (e.g. a compressed xdelta patch).
+    Preserves the original archive; only returns the decompressed path when
+    decompression fully succeeds. Falls back to the raw path for anything
+    that is not a recognised archive.
+    """
+    if not path.exists():
+        return path
+    suffix = _detect_archive_suffix(path)
+    if suffix not in (".zst", ".zstd", ".lz4", ".xz"):
+        return path
+
+    if _decompress_archive is None:
+        logger.error("Compression layer unavailable; cannot use %s", path)
+        return path
+
+    extracted = path.with_suffix("")
+    logger.info("Decompressing update payload: %s -> %s", path.name, extracted.name)
+    if _decompress_archive(path, extracted):
+        logger.info("Decompressed payload ready (%d bytes)", extracted.stat().st_size)
+        return extracted
+
+    logger.error("Decompression of %s failed; update will not use it", path)
+    return path
+
+
 def find_inactive_snapshot() -> Optional[str]:
     try:
         result = subprocess.run(
@@ -284,7 +431,7 @@ def apply_full_update(iso_path: Path, target_snapshot: str) -> bool:
 
     try:
         result = subprocess.run(
-            ["mount", "-o", f"subvol={target_snapshot.lstrip('/')}", "/dev/disk/by-label/NEXUSOS_ROOT", str(BTRFS_MOUNT)],
+            ["mount", "-o", f"subvol={target_snapshot.lstrip('/')}", "/dev/disk/by-label/aion", str(BTRFS_MOUNT)],
             capture_output=True, text=True, timeout=60,
         )
         if result.returncode != 0:
@@ -302,11 +449,11 @@ def apply_full_update(iso_path: Path, target_snapshot: str) -> bool:
             logger.error("Failed to extract update: %s", result.stderr)
             return False
 
-        nexus_dir = Path(mount_point) / "nexusos"
+        nexus_dir = Path(mount_point) / "aion"
         if nexus_dir.exists():
             squashfs_files = list(nexus_dir.glob("*.squashfs"))
             if squashfs_files:
-                overlay_mount = Path(mount_point) / "opt" / "nexusos" / "squashfs-root"
+                overlay_mount = Path(mount_point) / "opt" / "aion" / "squashfs-root"
                 overlay_mount.mkdir(parents=True, exist_ok=True)
 
                 for sq in squashfs_files:
@@ -345,12 +492,14 @@ def apply_incremental_patch(patch_info: dict, target_snapshot: str) -> bool:
     patch_url = patch_info["patch_url"]
     patch_sha256 = patch_info["sha256"]
 
-    patch_cache = Path("/var/cache/nexusos/patches")
+    patch_cache = Path("/var/cache/aion/patches")
     patch_cache.mkdir(parents=True, exist_ok=True)
     patch_file = patch_cache / f"patch-{patch_info['from_version']}-to-{patch_info['to_version']}.xdelta"
 
     if not download_file(patch_url, patch_file, "incremental patch"):
         return False
+
+    patch_file = prepare_downloaded_file(patch_file)
 
     if not verify_checksum(patch_file, patch_sha256):
         patch_file.unlink()
@@ -360,7 +509,7 @@ def apply_incremental_patch(patch_info: dict, target_snapshot: str) -> bool:
 
     try:
         result = subprocess.run(
-            ["mount", "-o", f"subvol={target_snapshot.lstrip('/')}", "/dev/disk/by-label/NEXUSOS_ROOT", str(BTRFS_MOUNT)],
+            ["mount", "-o", f"subvol={target_snapshot.lstrip('/')}", "/dev/disk/by-label/aion", str(BTRFS_MOUNT)],
             capture_output=True, text=True, timeout=60,
         )
         if result.returncode != 0:
@@ -394,35 +543,24 @@ def apply_incremental_patch(patch_info: dict, target_snapshot: str) -> bool:
 
 
 def set_next_boot_snapshot(snapshot_name: str) -> bool:
-    logger.info("Setting next boot to snapshot: %s", snapshot_name)
+    """Set next boot to use the inactive slot (A/B style)."""
+    inactive = get_inactive_slot()
+    logger.info("Setting next boot to Slot %s (subvol %s)", inactive, get_slot_subvol(inactive))
 
-    grub_cfg = Path("/boot/grub/grub.cfg")
-    if grub_cfg.exists():
-        try:
-            content = grub_cfg.read_text()
-            content = content.replace("rootflags=subvol=@", f"rootflags=subvol={snapshot_name}")
-            grub_cfg.write_text(content)
-            logger.info("GRUB config updated for next boot")
-        except Exception as e:
-            logger.warning("Failed to update GRUB config: %s", e)
-
+    # Update fstab for inactive slot
     btrfs_opts = Path("/etc/fstab")
     if btrfs_opts.exists():
         try:
+            import re
             content = btrfs_opts.read_text()
-            lines = content.split("\n")
-            updated_lines = []
-            for line in lines:
-                if "NEXUSOS_ROOT" in line or "/ btrfs" in line:
-                    import re
-                    line = re.sub(r"subvol=@[^,\s]*", f"subvol={snapshot_name}", line)
-                updated_lines.append(line)
-            btrfs_opts.write_text("\n".join(updated_lines))
-            logger.info("fstab updated for next boot")
+            content = re.sub(r"subvol=@[AB]", f"subvol={get_slot_subvol(inactive)}", content)
+            btrfs_opts.write_text(content)
+            logger.info("fstab updated for slot %s", inactive)
         except Exception as e:
             logger.warning("Failed to update fstab: %s", e)
 
-    return True
+    # Switch BLS boot entry
+    return set_boot_slot(inactive)
 
 
 def write_update_marker(version: str, notes: str = "") -> None:
@@ -447,13 +585,13 @@ def send_notification(version: str, notes: str = "") -> bool:
         except Exception:
             pass
 
-    message = f"NexusOS {version} is ready to install."
+    message = f"Aion {version} is ready to install."
     if notes:
         message += f" {notes[:200]}"
 
     try:
         result = subprocess.run(
-            ["notify-send", "-i", "system-software-update", "NexusOS Update Available", message],
+            ["notify-send", "-i", "system-software-update", "Aion Update Available", message],
             capture_output=True, text=True, timeout=10,
         )
         if result.returncode == 0:
@@ -507,7 +645,40 @@ def check_for_updates() -> dict:
     return result
 
 
-def apply_update() -> bool:
+def system_busy(load_threshold: float = 3.0, min_uptime_min: int = 5) -> bool:
+    """Check whether the machine is too busy / freshly booted for a silent
+    background update. Returns True when the updater should defer."""
+    try:
+        with open("/proc/loadavg", "r", encoding="utf-8") as f:
+            parts = f.read().split()
+            load1 = float(parts[0])
+        if load1 > load_threshold:
+            logger.info("Deferring silent update: load %.2f > %.1f", load1, load_threshold)
+            return True
+    except (OSError, ValueError, IndexError):
+        pass
+
+    try:
+        with open("/proc/uptime", "r", encoding="utf-8") as f:
+            uptime_min = float(f.read().split()[0]) / 60.0
+        if uptime_min < min_uptime_min:
+            logger.info(
+                "Deferring silent update: uptime %.0f min < %d min",
+                uptime_min, min_uptime_min,
+            )
+            return True
+    except (OSError, ValueError, IndexError):
+        pass
+
+    return False
+
+
+def apply_update(silent: bool = False) -> bool:
+    """Apply update by writing to inactive slot, then switching boot entry.
+
+    With ``silent=True`` the flow behaves identically but skips desktop
+    notifications so a gamer is never interrupted mid-session.
+    """
     result = check_for_updates()
     if not result["update_available"]:
         logger.info("No update to apply")
@@ -516,95 +687,116 @@ def apply_update() -> bool:
     current = result["current_version"]
     latest = result["latest_version"]
     manifest = result["manifest"]
+    inactive = get_inactive_slot()
+    inactive_subvol = get_slot_subvol(inactive)
 
-    config = load_system_config()
-    rollback_subvol = config.get("boot", {}).get("rollback_subvol", "@-rollback")
+    logger.info("Applying update: %s → %s (writing to Slot %s)", current, latest, inactive)
 
-    logger.info("Saving current system state as rollback snapshot")
-    existing_rollback = find_inactive_snapshot()
-    if existing_rollback:
-        delete_snapshot(existing_rollback)
-
-    rollback = create_snapshot(rollback_subvol.lstrip("/"))
-    if not rollback:
-        logger.error("Failed to create rollback snapshot")
+    # Step 1: Mount inactive slot subvolume
+    BTRFS_MOUNT.mkdir(parents=True, exist_ok=True)
+    try:
+        subprocess.run(
+            ["mount", "-o", f"subvol={inactive_subvol}", "/dev/disk/by-label/aion", str(BTRFS_MOUNT)],
+            capture_output=True, text=True, timeout=60,
+            check=True,
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+        logger.error("Failed to mount inactive slot: %s", e)
         return False
 
+    # Step 2: Apply update (incremental or full)
+    success = False
     if result["incremental_available"]:
-        patch_info = result["patch_info"]
-        inactive = create_snapshot("@-inactive")
-        if not inactive:
-            logger.error("Failed to create inactive snapshot")
+        success = apply_incremental_patch(result["patch_info"], inactive_subvol)
+    else:
+        iso_url = manifest.get("download_url", "")
+        if not iso_url:
+            logger.error("No download URL in manifest")
+            subprocess.run(["umount", str(BTRFS_MOUNT)], capture_output=True, timeout=30)
             return False
 
-        if not apply_incremental_patch(patch_info, inactive):
-            delete_snapshot(inactive.lstrip("/"))
-            logger.error("Incremental patch failed")
-            return False
+        iso_cache = Path("/var/cache/aion/isos")
+        iso_cache.mkdir(parents=True, exist_ok=True)
+        iso_file = iso_cache / f"aion-{latest}.iso"
 
-        set_next_boot_snapshot(inactive.lstrip("/"))
-        write_update_marker(latest, manifest.get("release_notes", ""))
-        send_notification(latest, manifest.get("release_notes", ""))
-        logger.info("Incremental update applied. Reboot to activate.")
-        return True
+        if not iso_file.exists():
+            if not download_file(iso_url, iso_file, f"ISO v{latest}"):
+                subprocess.run(["umount", str(BTRFS_MOUNT)], capture_output=True, timeout=30)
+                return False
 
-    iso_url = manifest.get("download_url", "")
-    if not iso_url:
-        logger.error("No download URL in manifest")
+            iso_file = prepare_downloaded_file(iso_file)
+
+            iso_sha256 = manifest.get("sha256", "")
+            if iso_sha256 and not verify_checksum(iso_file, iso_sha256):
+                iso_file.unlink()
+                subprocess.run(["umount", str(BTRFS_MOUNT)], capture_output=True, timeout=30)
+                return False
+
+        success = apply_full_update(iso_file, inactive_subvol)
+
+    # Step 3: Unmount
+    subprocess.run(["umount", str(BTRFS_MOUNT)], capture_output=True, timeout=30)
+
+    if not success:
+        logger.error("Update application failed")
         return False
 
-    iso_cache = Path("/var/cache/nexusos/isos")
-    iso_cache.mkdir(parents=True, exist_ok=True)
-    iso_file = iso_cache / f"nexusos-{latest}.iso"
-
-    if not iso_file.exists():
-        if not download_file(iso_url, iso_file, f"ISO v{latest}"):
-            return False
-
-        iso_sha256 = manifest.get("sha256", "")
-        if iso_sha256 and not verify_checksum(iso_file, iso_sha256):
-            iso_file.unlink()
-            return False
-
-    inactive = create_snapshot("@-inactive")
-    if not inactive:
-        logger.error("Failed to create inactive snapshot for full update")
+    # Step 4: Switch boot entry to inactive slot
+    if not set_boot_slot(inactive):
+        logger.error("Failed to switch boot slot. Update NOT applied.")
         return False
 
-    if not apply_full_update(iso_file, inactive):
-        delete_snapshot(inactive.lstrip("/"))
-        logger.error("Full update failed")
-        return False
+    # Step 5: Reset boot counter (mark-good will run on next successful boot)
+    if AB_MANAGER.exists():
+        try:
+            subprocess.run([str(AB_MANAGER), "mark-good"], capture_output=True, timeout=10)
+        except Exception:
+            pass
 
-    set_next_boot_snapshot(inactive.lstrip("/"))
     write_update_marker(latest, manifest.get("release_notes", ""))
-    send_notification(latest, manifest.get("release_notes", ""))
-    logger.info("Full update applied. Reboot to activate.")
+    if silent:
+        logger.info("Silent update staged to Slot %s (activate on reboot)", inactive)
+    else:
+        send_notification(latest, manifest.get("release_notes", ""))
+    logger.info("Update applied. Reboot to activate Slot %s.", inactive)
     return True
 
 
 def rollback() -> bool:
-    config = load_system_config()
-    rollback_subvol = config.get("boot", {}).get("rollback_subvol", "@-rollback")
-    rollback_path = Path(rollback_subvol)
+    """Rollback by switching to the inactive slot (A/B style)."""
+    active = get_active_slot()
+    inactive = get_inactive_slot()
 
-    if not rollback_path.exists():
-        logger.error("Rollback snapshot %s does not exist", rollback_subvol)
-        return False
+    logger.info("Rolling back: Slot %s → Slot %s", active, inactive)
 
-    logger.info("Rolling back to snapshot: %s", rollback_subvol)
-    set_next_boot_snapshot(rollback_subvol.lstrip("/"))
-    logger.info("Rollback configured. Reboot to activate.")
-    send_notification("rollback", f"System will roll back to {rollback_subvol} on next boot.")
-    return True
+    if AB_MANAGER.exists():
+        try:
+            result = subprocess.run(
+                [str(AB_MANAGER), "rollback"],
+                capture_output=True, text=True, timeout=30,
+            )
+            if result.returncode == 0:
+                logger.info("Rollback completed via A/B manager")
+                return True
+        except (subprocess.TimeoutExpired, Exception) as e:
+            logger.warning("A/B manager rollback failed: %s", e)
+
+    # Fallback: switch boot slot
+    if set_boot_slot(inactive):
+        logger.info("Rollback configured. Reboot to activate Slot %s.", inactive)
+        send_notification("rollback", f"System will roll back to Slot {inactive} on next boot.")
+        return True
+
+    logger.error("Rollback failed")
+    return False
 
 
 def install_systemd_timer() -> bool:
-    service_src = Path(__file__).parent / "nexusos-ota.service"
-    timer_src = Path(__file__).parent / "nexusos-ota.timer"
+    service_src = Path(__file__).parent / "aion-ota.service"
+    timer_src = Path(__file__).parent / "aion-ota.timer"
 
-    service_dst = Path("/etc/systemd/system/nexusos-ota.service")
-    timer_dst = Path("/etc/systemd/system/nexusos-ota.timer")
+    service_dst = Path("/etc/systemd/system/aion-ota.service")
+    timer_dst = Path("/etc/systemd/system/aion-ota.timer")
 
     try:
         if service_src.exists():
@@ -613,8 +805,8 @@ def install_systemd_timer() -> bool:
             shutil.copy2(str(timer_src), str(timer_dst))
 
         subprocess.run(["systemctl", "daemon-reload"], capture_output=True, timeout=30)
-        subprocess.run(["systemctl", "enable", "nexusos-ota.timer"], capture_output=True, timeout=30)
-        subprocess.run(["systemctl", "start", "nexusos-ota.timer"], capture_output=True, timeout=30)
+        subprocess.run(["systemctl", "enable", "aion-ota.timer"], capture_output=True, timeout=30)
+        subprocess.run(["systemctl", "start", "aion-ota.timer"], capture_output=True, timeout=30)
 
         logger.info("OTA timer installed and started")
         return True
@@ -626,14 +818,14 @@ def install_systemd_timer() -> bool:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="NexusOS OTA Update System",
+        description="Aion OTA Update System",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  nexusos-ota --check-only       Check for available updates
-  nexusos-ota --apply            Download and apply update
-  nexusos-ota --rollback         Rollback to previous snapshot
-  nexusos-ota --install-timer    Install systemd timer for automatic checks
+  aion-ota --check-only       Check for available updates
+  aion-ota --apply            Download and apply update
+  aion-ota --rollback         Rollback to previous snapshot
+  aion-ota --install-timer    Install systemd timer for automatic checks
         """,
     )
     parser.add_argument("--check-only", action="store_true", help="Check for updates without applying")
@@ -641,6 +833,8 @@ Examples:
     parser.add_argument("--rollback", action="store_true", help="Rollback to previous system snapshot")
     parser.add_argument("--install-timer", action="store_true", help="Install systemd timer for OTA checks")
     parser.add_argument("--force", action="store_true", help="Force update even if already up to date")
+    parser.add_argument("--silent", action="store_true", help="Apply update without desktop notifications")
+    parser.add_argument("--defer-if-busy", action="store_true", help="Skip update when system load is high or uptime is low")
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
 
     args = parser.parse_args()
@@ -671,7 +865,10 @@ Examples:
             sys.exit(0)
 
     if args.apply:
-        success = apply_update()
+        if args.defer_if_busy and system_busy():
+            logger.info("System busy; deferring update to a later run")
+            sys.exit(0)
+        success = apply_update(silent=args.silent)
         sys.exit(0 if success else 1)
 
     result = check_for_updates()

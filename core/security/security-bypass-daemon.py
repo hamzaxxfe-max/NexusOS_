@@ -20,12 +20,12 @@ from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QObject
 from PyQt6.QtGui import QFont, QColor, QPalette, QIcon, QPixmap, QPainter
 import inotify_simple
 
-LOG_DIR = Path("/var/log/nexusos")
+LOG_DIR = Path("/var/log/aion")
 LOG_FILE = LOG_DIR / "security-bypass.log"
-CONFIG_PATH = Path("/etc/nexusos/config.json")
+CONFIG_PATH = Path("/etc/aion/config.json")
 TRUSTED_CACHE_PATH = LOG_DIR / "trusted-hashes.json"
-BYPASS_SOCKET = "/run/nexusos/bypass.sock"
-INOTIFY_WATCH_PATHS = ["/opt/nexusos/games", "/usr/bin", "/usr/local/bin", "/home"]
+BYPASS_SOCKET = "/run/aion/bypass.sock"
+INOTIFY_WATCH_PATHS = ["/opt/aion/games", "/usr/bin", "/usr/local/bin", "/home"]
 POLKIT_TIMEOUT_MS = 30000
 ACCENT_COLOR = "#00D2FF"
 BG_COLOR = "#121212"
@@ -36,7 +36,7 @@ TEXT_SECONDARY = "#B0B0B0"
 BLOCK_BUTTON_COLOR = "#FF4444"
 PROCEED_BUTTON_COLOR = "#00D2FF"
 
-logger = logging.getLogger("nexusos-security-bypass")
+logger = logging.getLogger("aion-security-bypass")
 
 
 class SecurityConfig:
@@ -142,7 +142,7 @@ class WarningDialog(QDialog):
         self._setup_ui(risk_description)
 
     def _setup_ui(self, risk_description: str) -> None:
-        self.setWindowTitle("NexusOS Security Warning")
+        self.setWindowTitle("Aion Security Warning")
         self.setFixedSize(520, 420)
         self.setWindowFlags(
             Qt.WindowType.Dialog | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.FramelessWindowHint
@@ -223,7 +223,7 @@ class WarningDialog(QDialog):
         layout.addWidget(risk_frame)
 
         info_label = QLabel(
-            "This executable is not signed or verified by NexusOS. "
+            "This executable is not signed or verified by Aion. "
             "Running untrusted software may compromise system security."
         )
         info_label.setWordWrap(True)
@@ -580,7 +580,7 @@ class SecurityBypassDaemon(QObject):
 
     def run(self) -> None:
         self.running = True
-        logger.info("NexusOS Security Bypass Daemon starting (PID %d)", os.getpid())
+        logger.info("Aion Security Bypass Daemon starting (PID %d)", os.getpid())
         logger.info("Config loaded: sandbox_enabled=%s, trusted_paths=%d",
                      self.config.sandbox_enabled, len(self.config.trusted_paths))
         self._setup_inotify_watches()
@@ -621,7 +621,7 @@ class SecurityBypassDaemon(QObject):
 
 def check_root() -> None:
     if os.getuid() != 0:
-        print("Error: nexusos-security-bypass must run as root", file=sys.stderr)
+        print("Error: aion-security-bypass must run as root", file=sys.stderr)
         sys.exit(1)
 
 

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Aion Chrome
+Comment=Optimized web browser for Aion Gaming
+Exec=/usr/bin/google-chrome-stable --enable-gpu-rasterization --enable-zero-copy --ignore-gpu-blocklist --enable-features=VaapiVideoDecoder,VaapiVideoDecodeLinuxGL --disable-features=TranslateUI --disable-background-networking --disable-default-apps --no-first-run --password-store=basic --disable-features=ChromeWhatsNewUI --disable-features=SidePanelPinning %U
+Icon=google-chrome-stable
+Terminal=false
+Categories=Network;WebBrowser;
+MimeType=text/html;application/xhtml+xml;x-scheme-handler/http;x-scheme-handler/https;
+StartupWMClass=google-chrome

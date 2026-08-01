@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NexusOS Live Wallpaper Engine — mpv-based daemon with VAAPI and focus-pause."""
+"""Aion Live Wallpaper Engine — mpv-based daemon with VAAPI and focus-pause."""
 
 import fcntl
 import json
@@ -23,19 +23,19 @@ from PyQt6.QtWidgets import (
     QSystemTrayIcon,
 )
 
-APP_NAME = "NexusOS Live Wallpaper Engine"
+APP_NAME = "Aion Live Wallpaper Engine"
 APP_VERSION = "1.0.0"
-CONFIG_PATH = Path("/etc/nexusos/live-wallpaper.json")
-LOCK_FILE = Path("/tmp/nexusos-live-wallpaper.lock")
-MPV_SOCKET = Path("/tmp/nexusos-mpv-socket")
-LOG_DIR = Path("/var/log/nexusos")
+CONFIG_PATH = Path("/etc/aion/live-wallpaper.json")
+LOCK_FILE = Path("/tmp/aion-live-wallpaper.lock")
+MPV_SOCKET = Path("/tmp/aion-mpv-socket")
+LOG_DIR = Path("/var/log/aion")
 LOG_PATH = LOG_DIR / "live-wallpaper.log"
-PID_FILE = Path("/tmp/nexusos-live-wallpaper.pid")
+PID_FILE = Path("/tmp/aion-live-wallpaper.pid")
 
 DEFAULT_CONFIG = {
     "enabled": True,
-    "wallpaper_dir": "/usr/share/nexusos/live-wallpapers",
-    "user_wallpaper_dir": "~/Videos/NexusOS-Wallpapers",
+    "wallpaper_dir": "/usr/share/aion/live-wallpapers",
+    "user_wallpaper_dir": "~/Videos/Aion-Wallpapers",
     "current_wallpaper": "",
     "playback_mode": "single",
     "cycle_interval_sec": 300,

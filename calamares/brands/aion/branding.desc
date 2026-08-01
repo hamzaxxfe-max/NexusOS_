@@ -1,0 +1,26 @@
+﻿# Aion Calamares Branding
+# Visual identity for the installer
+
+name: Aion
+version: 1.0
+type: os
+background: aion-wallpaper
+banner: aion-banner
+productIcon: aion-logo
+
+# ── strings ──
+strings:
+    welcomeMessage: "Welcome to Aion"
+    welcomeSubtitle: "The immutable gaming OS"
+    version: "1.0"
+    bootloaderMessage: "Install bootloader"
+    efiBootLoaders: "systemd-boot"
+
+# ── pages ──
+welcome:
+    showBackButton: false
+
+# ── sidebar ──
+sidebar:
+    sidebarBackground: "aion-gradient"
+    sidebarText: "Aion Installer"

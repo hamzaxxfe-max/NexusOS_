@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# NexusOS Regression Test Runner
+# Aion Regression Test Runner
 # Runs all 4 regression test suites, captures results, prints summary.
 
 set -u
@@ -89,7 +89,7 @@ run_suite() {
 print_summary() {
     echo ""
     echo -e "${BOLD}${CYAN}╔══════════════════════════════════════════════════════════════╗${RESET}"
-    echo -e "${BOLD}${CYAN}║            NexusOS Regression Test Summary                  ║${RESET}"
+    echo -e "${BOLD}${CYAN}║            Aion Regression Test Summary                  ║${RESET}"
     echo -e "${BOLD}${CYAN}╠══════════════════════════════════════════════════════════════╣${RESET}"
     printf "${BOLD}${CYAN}║${RESET} %-25s │ %-30s ${BOLD}${CYAN}║${RESET}\n" "Suite" "Result"
     echo -e "${BOLD}${CYAN}╠══════════════════════════════════════════════════════════════╣${RESET}"
@@ -126,7 +126,7 @@ print_summary() {
 
 main() {
     echo -e "${BOLD}${CYAN}╔══════════════════════════════════════════════════════════════╗${RESET}"
-    echo -e "${BOLD}${CYAN}║         NexusOS Comprehensive Regression Test Suite         ║${RESET}"
+    echo -e "${BOLD}${CYAN}║         Aion Comprehensive Regression Test Suite         ║${RESET}"
     echo -e "${BOLD}${CYAN}╚══════════════════════════════════════════════════════════════╝${RESET}"
     echo ""
     echo "  Project root: ${PROJ_ROOT}"

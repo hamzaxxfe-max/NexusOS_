@@ -1,0 +1,25 @@
+[Unit]
+Description=Aion Silent Background Update Service
+Documentation=https://aion.dev/docs/updates
+After=network-online.target
+Wants=network-online.target
+RequiresMountsFor=/var/log/aion
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/lib/aion/ota-updater.py --check-only
+ExecStart=/usr/bin/python3 /usr/lib/aion/ota-updater.py --apply --silent --defer-if-busy
+ExecStartPre=/usr/bin/mkdir -p /var/log/aion
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=aion-ota-silent
+Nice=15
+IOSchedulingClass=idle
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/aion /var/lib/aion /etc/aion /tmp
+NoNewPrivileges=false
+CapabilityBoundingSet=CAP_SYS_ADMIN CAP_FOWNER CAP_DAC_OVERRIDE
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,41 @@
+{
+    "homepage": "https://aion.dev",
+    "homepage_is_newtabpage": false,
+    "browser": {
+        "check_default_browser": false,
+        "show_home_button": true
+    },
+    "extensions": {
+        "ui": {
+            "developer_mode": false
+        },
+        "blacklist": {
+            "enabled": true,
+            "blocked_types": ["theme"]
+        }
+    },
+    "hardware_acceleration_mode_enabled": true,
+    "gpu_rasterization_enabled": true,
+    "zero_copy_rasterizer_enabled": true,
+    "ignore_gpu_blocklist": true,
+    "canvas_oop_rasterization_enabled": true,
+    "disable_background_networking": true,
+    "disable_default_apps": true,
+    "disable_default_extensions": true,
+    "disable_feature_enrichment": true,
+    "disable_hang_monitor": true,
+    "disable_office_editing_component_app": true,
+    "disable_print_preview": false,
+    "disable_prompt_on_repost": true,
+    "disable_session_crashed_bubble": true,
+    "disable_web_speech_api": true,
+    "enable_parallel_downloading": true,
+    "enable_quic": true,
+    "dns_over_https_templates": "https://mozilla.cloudflare-dns.com/dns-query",
+    "password_manager_enabled": false,
+    "signin_allowed": false,
+    "metrics_reporting_enabled": false,
+    "translate_enabled": false,
+    "safe_browsing_protection_level": 1,
+    "variant": "Aion"
+}

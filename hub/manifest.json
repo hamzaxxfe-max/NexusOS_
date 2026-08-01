@@ -1,0 +1,186 @@
+{
+  "version": "1.0",
+  "hub": "Aion Hub",
+  "apps": [
+    {
+      "id": "steam",
+      "name": "Steam",
+      "category": "game-platform",
+      "provider": "pacman",
+      "install": ["steam"],
+      "tags": ["gaming", "launcher", "store", "valve"],
+      "description": "Play thousands of games — the largest PC gaming store.",
+      "icon": "steam"
+    },
+    {
+      "id": "lutris",
+      "name": "Lutris",
+      "category": "game-platform",
+      "provider": "pacman",
+      "install": ["lutris"],
+      "tags": ["gaming", "launcher", "multi-platform"],
+      "description": "One launcher for every game: native, Wine, emulators and cloud.",
+      "icon": "lutris"
+    },
+    {
+      "id": "heroic",
+      "name": "Heroic Games Launcher",
+      "category": "game-platform",
+      "provider": "pacman",
+      "install": ["heroic-games-launcher"],
+      "tags": ["gaming", "launcher", "epic", "gog"],
+      "description": "Epic Games and GOG games on Linux, open source.",
+      "icon": "heroic"
+    },
+    {
+      "id": "bottles",
+      "name": "Bottles",
+      "category": "game-platform",
+      "provider": "flatpak",
+      "install": ["com.usebottles.bottles"],
+      "tags": ["gaming", "wine", "windows-apps"],
+      "description": "Run Windows software and games with Wine, easily.",
+      "icon": "bottles"
+    },
+    {
+      "id": "wine",
+      "name": "Wine (Windows compatibility)",
+      "category": "compatibility",
+      "provider": "pacman",
+      "install": ["wine", "wine-mono", "wine-gecko"],
+      "tags": ["compatibility", "windows", "runtime"],
+      "description": "Run Windows applications and games natively.",
+      "icon": "wine"
+    },
+    {
+      "id": "protonup",
+      "name": "ProtonUp-Qt",
+      "category": "game-platform",
+      "provider": "pacman",
+      "install": ["protonup-qt"],
+      "tags": ["gaming", "proton", "tools"],
+      "description": "Install and manage custom Proton/Wine versions for any game.",
+      "icon": "protonup"
+    },
+    {
+      "id": "mangohud",
+      "name": "MangoHud (performance overlay)",
+      "category": "gaming-tools",
+      "provider": "pacman",
+      "install": ["mangohud"],
+      "tags": ["gaming", "overlay", "fps", "performance"],
+      "description": "See FPS, frametimes, CPU/GPU stats live in any game.",
+      "icon": "mangohud"
+    },
+    {
+      "id": "gamescope",
+      "name": "Gamescope (micro-compositor)",
+      "category": "gaming-tools",
+      "provider": "pacman",
+      "install": ["gamescope"],
+      "tags": ["gaming", "compositor", "fps", "steam-deck"],
+      "description": "Steam Deck style scaling and framerate control for games.",
+      "icon": "gamescope"
+    },
+    {
+      "id": "code",
+      "name": "VS Code",
+      "category": "development",
+      "provider": "flatpak",
+      "install": ["com.visualstudio.code"],
+      "tags": ["development", "ide", "editor"],
+      "description": "The most popular code editor, full IDE features.",
+      "icon": "code"
+    },
+    {
+      "id": "docker",
+      "name": "Docker",
+      "category": "development",
+      "provider": "pacman",
+      "install": ["docker", "docker-compose"],
+      "tags": ["development", "containers", "devops"],
+      "description": "Run and manage containers — build anything anywhere.",
+      "icon": "docker"
+    },
+    {
+      "id": "git",
+      "name": "Git",
+      "category": "development",
+      "provider": "pacman",
+      "install": ["git"],
+      "tags": ["development", "version-control", "tools"],
+      "description": "Version control for every project.",
+      "icon": "git"
+    },
+    {
+      "id": "python",
+      "name": "Python (dev toolchain)",
+      "category": "development",
+      "provider": "pacman",
+      "install": ["python", "python-pip", "python-poetry"],
+      "tags": ["development", "python", "programming"],
+      "description": "Python runtime plus pip and poetry for developers.",
+      "icon": "python"
+    },
+    {
+      "id": "firefox",
+      "name": "Firefox",
+      "category": "productivity",
+      "provider": "pacman",
+      "install": ["firefox"],
+      "tags": ["browser", "internet", "privacy"],
+      "description": "Fast, private, open-source web browser.",
+      "icon": "firefox"
+    },
+    {
+      "id": "libreoffice",
+      "name": "LibreOffice",
+      "category": "productivity",
+      "provider": "pacman",
+      "install": ["libreoffice-fresh"],
+      "tags": ["office", "documents", "productivity"],
+      "description": "Complete office suite: documents, sheets, slides.",
+      "icon": "libreoffice"
+    },
+    {
+      "id": "gimp",
+      "name": "GIMP",
+      "category": "creative",
+      "provider": "pacman",
+      "install": ["gimp"],
+      "tags": ["design", "image-editing", "creative"],
+      "description": "Powerful free image editor — Photoshop alternative.",
+      "icon": "gimp"
+    },
+    {
+      "id": "obs",
+      "name": "OBS Studio",
+      "category": "creative",
+      "provider": "pacman",
+      "install": ["obs-studio"],
+      "tags": ["streaming", "recording", "creative"],
+      "description": "Stream and record gameplay or screen in 4K.",
+      "icon": "obs"
+    },
+    {
+      "id": "retroarch",
+      "name": "RetroArch (emulators)",
+      "category": "gaming-tools",
+      "provider": "pacman",
+      "install": ["retroarch", "libretro-core-info"],
+      "tags": ["gaming", "emulator", "retro"],
+      "description": "Play classics from NES to PS1 in one app.",
+      "icon": "retroarch"
+    },
+    {
+      "id": "discord",
+      "name": "Discord",
+      "category": "communication",
+      "provider": "flatpak",
+      "install": ["com.discordapp.Discord"],
+      "tags": ["communication", "voice", "gaming"],
+      "description": "Chat, voice and community for gamers and teams.",
+      "icon": "discord"
+    }
+  ]
+}

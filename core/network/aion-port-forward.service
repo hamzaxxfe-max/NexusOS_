@@ -1,0 +1,12 @@
+[Unit]
+Description=Aion Gaming Port Forwarding
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/aion-port-forward.sh start
+ExecStop=/usr/local/bin/aion-port-forward.sh stop
+
+[Install]
+WantedBy=multi-user.target

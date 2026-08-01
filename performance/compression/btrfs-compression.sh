@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# NexusOS Btrfs Compression Setup
-# Configures compression for /mnt/nexusos-games (1TB external drive)
+# Aion Btrfs Compression Setup
+# Configures compression for /mnt/aion-games (1TB external drive)
 #
 # Math proof: compression-math.md
 # Compression ratio: 1.8:1 (game data, zstd level 3)
@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-MOUNT_POINT="/mnt/nexusos-games"
+MOUNT_POINT="/mnt/aion-games"
 DEVICE=""
 VERIFY_MODE=false
 VERIFY_SIZE_MB=256
@@ -162,7 +162,7 @@ verify_compression() {
     log_info "Running compression ratio verification (${VERIFY_SIZE_MB} MB test data)"
 
     local test_dir
-    test_dir=$(mktemp -d -p "$MOUNT_POINT/temp" nexusos-verify-XXXXXX)
+    test_dir=$(mktemp -d -p "$MOUNT_POINT/temp" aion-verify-XXXXXX)
     local test_file="${test_dir}/testdata.bin"
     local comp_file="${test_dir}/testdata.bin.zst"
 

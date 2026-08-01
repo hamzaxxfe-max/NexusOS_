@@ -1,0 +1,13 @@
+[Unit]
+Description=Aion Silent Background Update Timer (daily, low priority)
+Documentation=https://aion.dev/docs/updates
+
+[Timer]
+OnBootSec=30min
+OnUnitActiveSec=1d
+Persistent=true
+RandomizedDelaySec=1h
+AccuracySec=30min
+
+[Install]
+WantedBy=timers.target

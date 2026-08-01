@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-LOG_DIR="/var/log/nexusos"
+LOG_DIR="/var/log/aion"
 LOG_FILE="${LOG_DIR}/waydroid-init.log"
 WAYDROID_DATA="/var/lib/waydroid"
 ANDROID_FILES="$HOME/Android Files"
@@ -173,6 +173,112 @@ initialize_container() {
     else
         die "Container images not found after init"
     fi
+
+    # ── Isolation: Create sandboxed user for Waydroid ────────────────
+    setup_waydroid_isolation
+}
+
+setup_waydroid_isolation() {
+    log "INFO" "Setting up Waydroid sandboxed user..."
+
+    local WAYDROID_USER="waydroid-sandbox"
+    local WAYDROID_UID=5000
+    local WAYDROID_GID=5000
+
+    # Create dedicated user (no login shell, no home directory access)
+    if ! id "$WAYDROID_USER" &>/dev/null; then
+        groupadd -g "$WAYDROID_GID" "$WAYDROID_USER" 2>/dev/null || true
+        useradd -r -u "$WAYDROID_UID" -g "$WAYDROID_GID" \
+            -d /dev/null -s /usr/bin/nologin \
+            -c "Waydroid Sandbox" "$WAYDROID_USER" 2>/dev/null || true
+        log "INFO" "Created sandboxed user: ${WAYDROID_USER} (uid=${WAYDROID_UID})"
+    fi
+
+    # Grant access to waydroid data directory only
+    chown -R "${WAYDROID_USER}:${WAYDROID_USER}" "$WAYDROID_DATA" 2>/dev/null || true
+
+    # Create isolated home for Android files
+    local ANDROID_ISOLATED="/var/lib/waydroid/home"
+    mkdir -p "$ANDROID_ISOLATED"
+    chown "${WAYDROID_USER}:${WAYDROID_USER}" "$ANDROID_ISOLATED"
+
+    # SELinux policy: confine waydroid-sandbox user
+    local SELINUX_POLICY="/etc/selinux/aion/waydroid-sandbox.te"
+    mkdir -p "$(dirname "$SELINUX_POLICY")"
+
+    cat > "$SELINUX_POLICY" <<'SELINUX_TE'
+# Aion Waydroid Sandbox SELinux Policy
+# Confines the waydroid-sandbox user to prevent access to:
+# - Linux user home directories
+# - System configuration files
+# - Kernel modules
+# - Other users' processes
+
+policy_module(aion_waydroid_sandbox, 1.0)
+
+# Define the sandbox user type
+type waydroid_sandbox_t;
+type waydroid_sandbox_exec_t;
+files_type(waydroid_sandbox_exec_t)
+
+# Sandbox user domain
+userdom_user_template(waydroid_sandbox)
+role system_r types waydroid_sandbox_t;
+
+# Deny access to Linux user homes
+neverallow waydroid_sandbox_t user_home_dir_t:dir ~{ getattr search open read };
+neverallow waydroid_sandbox_t user_home_t:dir ~{ getattr search open read };
+
+# Deny system config access
+neverallow waydroid_sandbox_t etc_t:dir ~{ write add_name remove_name };
+neverallow waydroid_sandbox_t etc_t:file ~{ write append create unlink };
+
+# Deny kernel module operations
+neverallow waydroid_sandbox_t kernel_t:system ~{ module_request };
+
+# Deny access to other users' processes
+neverallow waydroid_sandbox_t user_t:process ~{ ptrace signal signull };
+
+# Allow access only to waydroid data
+allow waydroid_sandbox_t waydroid_data_t:dir ~{ getattr search open read write add_name };
+allow waydroid_sandbox_t waydroid_data_t:file ~{ getattr open read write append create unlink };
+
+# Allow binder IPC (required for Android)
+allow waydroid_sandbox_t binderfs_device_t:chr_file ~{ ioctl read write open };
+
+# Allow GPU access for rendering
+allow waydroid_sandbox_t device_t:chr_file ~{ ioctl read write open mmap };
+
+# Allow network access (for Android apps)
+allow waydroid_sandbox_t self:tcp_socket ~{ create connect listen accept };
+allow waydroid_sandbox_t self:udp_socket ~{ create connect };
+SELINUX_TE
+
+    log "INFO" "SELinux policy created for Waydroid sandbox"
+
+    # Configure systemd service to run as sandboxed user
+    mkdir -p /etc/systemd/system/waydroid.service.d
+    cat > /etc/systemd/system/waydroid.service.d/sandbox.conf <<'SANDBOX_CONF'
+[Service]
+User=waydroid-sandbox
+Group=waydroid-sandbox
+# Restrict filesystem access
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/waydroid /tmp
+# No new privileges
+NoNewPrivileges=yes
+# Restrict capabilities
+CapabilityBoundingSet=
+# Restrict syscalls
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+# Private /tmp
+PrivateTmp=yes
+SANDBOX_CONF
+
+    systemctl daemon-reload
+    log "INFO" "Waydroid isolation configured"
 }
 
 configure_headless() {
@@ -199,9 +305,9 @@ LXC_EOF
         "persist.waydroid.height=720"
         "persist.waydroid.dpi=240"
         "persist.waydroid.active_ro=false"
-        "ro.build.display.id=NexusOS-Waydroid"
-        "persist.nexusos.headless=1"
-        "persist.nexusos.single_window=1"
+        "ro.build.display.id=Aion-Waydroid"
+        "persist.aion.headless=1"
+        "persist.aion.single_window=1"
     )
 
     for prop in "${waydroid_props[@]}"; do
@@ -271,7 +377,7 @@ GPU_EOF
         "GALLIUM_DRIVER=${gpu_driver}"
     )
 
-    local env_file="/etc/environment.d/nexusos-gpu.conf"
+    local env_file="/etc/environment.d/aion-gpu.conf"
     mkdir -p "$(dirname "$env_file")"
     for envvar in "${egl_env[@]}"; do
         if grep -q "^${envvar%%=*}=" "$env_file" 2>/dev/null; then
@@ -364,7 +470,7 @@ map_storage_directories() {
         fi
     done
 
-    cat > "${user_android}/.nexusos-storage-map.json" << JSON_EOF
+    cat > "${user_android}/.aion-storage-map.json" << JSON_EOF
 {
     "version": 1,
     "base": "${waydroid_shared}",
@@ -381,7 +487,7 @@ map_storage_directories() {
     }
 }
 JSON_EOF
-    chmod 644 "${user_android}/.nexusos-storage-map.json"
+    chmod 644 "${user_android}/.aion-storage-map.json"
 
     log "INFO" "Storage directories mapped"
 }
@@ -486,7 +592,7 @@ do_stop() {
 }
 
 do_status() {
-    echo "=== NexusOS Waydroid Status ==="
+    echo "=== Aion Waydroid Status ==="
     echo ""
 
     if systemctl is-active --quiet binder-linux.service 2>/dev/null; then
@@ -564,7 +670,7 @@ do_reset() {
 
 usage() {
     cat << USAGE_EOF
-NexusOS Waydroid Init Script
+Aion Waydroid Init Script
 
 Usage: $(basename "$0") [OPTIONS]
 
@@ -632,7 +738,7 @@ main() {
         exit 1
     fi
 
-    log "INFO" "=== NexusOS Waydroid Init - Action: ${action} ==="
+    log "INFO" "=== Aion Waydroid Init - Action: ${action} ==="
 
     case "$action" in
         full)
@@ -649,7 +755,7 @@ main() {
             create_systemd_services
             do_start
             log "INFO" "=== Full setup complete ==="
-            echo "NexusOS Waydroid setup complete. Android Files available at: ${ANDROID_FILES}"
+            echo "Aion Waydroid setup complete. Android Files available at: ${ANDROID_FILES}"
             ;;
         init)
             check_root

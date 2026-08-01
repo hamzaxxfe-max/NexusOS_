@@ -14,11 +14,11 @@ from typing import Dict, List, Optional, Set, Tuple, Any
 import evdev
 from evdev import UInput, ecodes, AbsInfo
 
-LOG_DIR = Path("/var/log/nexusos")
+LOG_DIR = Path("/var/log/aion")
 LOG_FILE = LOG_DIR / "input-engine.log"
-CONFIG_PATH = Path("/etc/nexusos/input-mapping.json")
+CONFIG_PATH = Path("/etc/aion/input-mapping.json")
 
-logger = logging.getLogger("nexusos-input-engine")
+logger = logging.getLogger("aion-input-engine")
 
 DEFAULT_CONFIG = {
     "deadzone": 0.15,
@@ -251,7 +251,7 @@ class UInputManager:
             ],
             ecodes.EV_KEY: self.MOUSE_KEY_EVENTS + self.KEY_EVENTS,
         }
-        self.uinput = UInput(cap, name="nexusos-virtual-input", phys="nexusos/input0")
+        self.uinput = UInput(cap, name="aion-virtual-input", phys="aion/input0")
         self.key_states: Dict[int, bool] = {}
 
     def emit_relative(self, axis: int, value: int) -> None:
@@ -670,7 +670,7 @@ class InputEngineDaemon:
             await asyncio.gather(*tasks, return_exceptions=True)
 
     def run(self) -> None:
-        logger.info("NexusOS Input Engine starting (PID %d)", os.getpid())
+        logger.info("Aion Input Engine starting (PID %d)", os.getpid())
         logger.info(
             "Config: deadzone=%.2f, sensitivity=%.2f, acceleration=%.2f",
             self.config.deadzone, self.config.mouse_sensitivity, self.config.mouse_acceleration,
@@ -710,7 +710,7 @@ class InputEngineDaemon:
 
 def check_root() -> None:
     if os.getuid() != 0:
-        print("Error: nexusos-input-engine must run as root", file=sys.stderr)
+        print("Error: aion-input-engine must run as root", file=sys.stderr)
         sys.exit(1)
 
 

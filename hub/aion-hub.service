@@ -1,0 +1,23 @@
+[Unit]
+Description=Aion Hub — one-click application and game portal
+After=local-fs.target network-online.target aion-performance-engine.service
+Wants=network-online.target
+ConditionPathExists=/opt/aion/hub
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/aion/hub/aion-hub-server.py --bind 127.0.0.1 --port 8931
+Restart=on-failure
+RestartSec=3
+Environment=AION_CONFIG_DIR=/etc/aion
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=aion-hub
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=false
+ProtectHome=false
+ReadWritePaths=/opt/aion/hub/installer /var/log/aion /opt/aion/games
+
+[Install]
+WantedBy=multi-user.target

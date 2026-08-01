@@ -1,4 +1,4 @@
-name: Release NexusOS ISO
+name: Release Aion ISO
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
   id-token: write
 
 env:
-  ISO_NAME: nexusos
+  ISO_NAME: aion
   BUILD_DIR: build
 
 jobs:
@@ -39,7 +39,7 @@ jobs:
           TAG="${GITHUB_REF#refs/tags/v}"
           echo "version=$TAG" >> "$GITHUB_OUTPUT"
           echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
-          echo "Building NexusOS v$TAG"
+          echo "Building Aion v$TAG"
 
       - name: Install build dependencies
         run: |
@@ -73,7 +73,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: NexusOS ${{ steps.version.outputs.version }}
+          name: Aion ${{ steps.version.outputs.version }}
           draft: false
           prerelease: ${{ contains(steps.version.outputs.version, '-') }}
           generate_release_notes: true
@@ -84,14 +84,14 @@ jobs:
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v4
         with:
-          name: nexusos-${{ steps.version.outputs.version }}-iso
+          name: aion-${{ steps.version.outputs.version }}-iso
           path: ${{ steps.build.outputs.iso_path }}
           retention-days: 30
 
       - name: Upload checksum artifact
         uses: actions/upload-artifact@v4
         with:
-          name: nexusos-${{ steps.version.outputs.version }}-checksums
+          name: aion-${{ steps.version.outputs.version }}-checksums
           path: ${{ env.BUILD_DIR }}/SHA256SUMS
           retention-days: 30
 
@@ -115,7 +115,7 @@ jobs:
       - name: Fetch build outputs
         uses: actions/download-artifact@v4
         with:
-          name: nexusos-${{ steps.version.outputs.version }}-checksums
+          name: aion-${{ steps.version.outputs.version }}-checksums
           path: /tmp/checksums
 
       - name: Read checksum
@@ -136,7 +136,7 @@ jobs:
           TAG="${GITHUB_REF_NAME}"
           REPO="${{ github.repository }}"
           RELEASE_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${TAG}/nexusos-${VERSION}.iso"
+          DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${TAG}/aion-${VERSION}.iso"
 
           if [ ! -f manifest.json ]; then
             echo '{"latest_version":"","download_url":"","sha256":"","release_date":"","release_notes":"","min_required_version":"0.9.0","size":0,"incremental_patches":[]}' > manifest.json
@@ -165,8 +165,8 @@ jobs:
 
       - name: Commit manifest update
         run: |
-          git config user.name "NexusOS CI"
-          git config user.email "ci@nexusos.dev"
+          git config user.name "Aion CI"
+          git config user.email "ci@aion.dev"
           git add manifest.json
           if git diff --cached --quiet; then
             echo "No manifest changes to commit"
@@ -184,11 +184,11 @@ jobs:
       - name: Print release summary
         run: |
           echo "============================================"
-          echo "  NexusOS ${{ github.ref_name }} Released"
+          echo "  Aion ${{ github.ref_name }} Released"
           echo "============================================"
           echo ""
           echo "ISO: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
           echo "Manifest: https://raw.githubusercontent.com/${{ github.repository }}/main/manifest.json"
-          echo "Pages: https://${{ github.repository_owner }}.github.io/nexusos/downloads/"
+          echo "Pages: https://${{ github.repository_owner }}.github.io/aion/downloads/"
           echo ""
           echo "CDN: GitHub's built-in CDN handles ISO distribution."

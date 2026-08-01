@@ -8,8 +8,8 @@ import logging
 import logging.handlers
 from pathlib import Path
 
-STATS_PATH = Path("/tmp/nexusos-gpu-stats.json")
-LOG_DIR = Path("/var/log/nexusos")
+STATS_PATH = Path("/tmp/aion-gpu-stats.json")
+LOG_DIR = Path("/var/log/aion")
 LOG_PATH = LOG_DIR / "gpu-monitor.log"
 POLL_INTERVAL = 2
 HISTORY_LENGTH = 60

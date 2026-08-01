@@ -18,14 +18,14 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QSize
 from PyQt6.QtGui import QPixmap, QImage, QIcon, QColor, QFont
 
-LOG_DIR = Path("/var/log/nexusos")
+LOG_DIR = Path("/var/log/aion")
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 LOG_FILE = LOG_DIR / "apk-installer.log"
 
-GAME_GRID_PATH = Path.home() / ".config" / "nexusos" / "game-grid.json"
+GAME_GRID_PATH = Path.home() / ".config" / "aion" / "game-grid.json"
 APPLICATIONS_DIR = Path.home() / ".local" / "share" / "applications"
-NEXUS_ICONS_DIR = Path.home() / ".local" / "share" / "nexusos" / "icons"
-CACHE_DIR = Path.home() / ".cache" / "nexusos" / "apk-installer"
+NEXUS_ICONS_DIR = Path.home() / ".local" / "share" / "aion" / "icons"
+CACHE_DIR = Path.home() / ".cache" / "aion" / "apk-installer"
 
 NEXOS_DARK_BG = "#0d0d12"
 NEXOS_PANEL_BG = "#161622"
@@ -95,7 +95,7 @@ class InstallWindow(QMainWindow):
         super().__init__()
         self.apk_path = Path(apk_path)
         self.worker = None
-        self.setWindowTitle("NexusOS APK Installer")
+        self.setWindowTitle("Aion APK Installer")
         self.setMinimumSize(520, 400)
         self.setMaximumSize(520, 400)
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
@@ -498,7 +498,7 @@ class InstallWorker(QThread):
         self.progress.emit(45)
 
         try:
-            with tempfile.TemporaryDirectory(prefix="nexusos_apk_") as tmpdir:
+            with tempfile.TemporaryDirectory(prefix="aion_apk_") as tmpdir:
                 tmp_apk = Path(tmpdir) / self.apk_path.name
                 shutil.copy2(self.apk_path, tmp_apk)
 
@@ -532,7 +532,7 @@ class InstallWorker(QThread):
     def _generate_desktop_file(self, app_name: str, package_name: str, icon_path: Path | None):
         APPLICATIONS_DIR.mkdir(parents=True, exist_ok=True)
         safe_name = package_name.replace(".", "-").lower()
-        desktop_file = APPLICATIONS_DIR / f"nexusos-{safe_name}.desktop"
+        desktop_file = APPLICATIONS_DIR / f"aion-{safe_name}.desktop"
 
         icon_spec = ""
         if icon_path and icon_path.exists():
@@ -544,14 +544,14 @@ class InstallWorker(QThread):
 Version=1.0
 Type=Application
 Name={app_name}
-Comment=NexusOS Android App
+Comment=Aion Android App
 Exec=waydroid app launch {package_name}
 Icon={icon_spec}
 Terminal=false
 Categories=Android;Game;
 MimeType={APK_MIME}
 StartupNotify=true
-Keywords=android;waydroid;nexusos;
+Keywords=android;waydroid;aion;
 """
         desktop_file.write_text(content, encoding="utf-8")
         desktop_file.chmod(0o755)
@@ -601,12 +601,12 @@ def register_mime_handler():
     try:
         desktop_dir = Path.home() / ".local" / "share" / "mime" / "packages"
         desktop_dir.mkdir(parents=True, exist_ok=True)
-        mime_xml = desktop_dir / "nexusos-apk-handler.xml"
+        mime_xml = desktop_dir / "aion-apk-handler.xml"
 
         xml_content = f"""<?xml version="1.0" encoding="UTF-8"?>
 <mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
   <mime-type type="{APK_MIME}">
-    <comment>NexusOS Android Package</comment>
+    <comment>Aion Android Package</comment>
     <glob pattern="*.apk"/>
     <sub-class-of type="application/zip"/>
   </mime-type>
@@ -619,7 +619,7 @@ def register_mime_handler():
         )
 
         subprocess.run(
-            ["xdg-mime", "default", "nexusos-apk-handler.desktop", APK_MIME],
+            ["xdg-mime", "default", "aion-apk-handler.desktop", APK_MIME],
             capture_output=True, timeout=10,
         )
 
@@ -629,7 +629,7 @@ def register_mime_handler():
 
 
 def check_single_instance():
-    lock_file = Path("/tmp/nexusos-apk-installer.lock")
+    lock_file = Path("/tmp/aion-apk-installer.lock")
     if lock_file.exists():
         try:
             pid = int(lock_file.read_text().strip())
@@ -644,7 +644,7 @@ def check_single_instance():
 
 
 def cleanup_lock():
-    lock_file = Path("/tmp/nexusos-apk-installer.lock")
+    lock_file = Path("/tmp/aion-apk-installer.lock")
     if lock_file.exists():
         try:
             pid = int(lock_file.read_text().strip())
@@ -661,8 +661,8 @@ def main():
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
     app = QApplication(sys.argv)
-    app.setApplicationName("NexusOS APK Installer")
-    app.setOrganizationName("NexusOS")
+    app.setApplicationName("Aion APK Installer")
+    app.setOrganizationName("Aion")
 
     dark_style = f"""
         QApplication {{

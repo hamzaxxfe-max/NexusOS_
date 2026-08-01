@@ -1,4 +1,4 @@
-# ZRAM Mathematical Proof — NexusOS 8GB System
+# ZRAM Mathematical Proof — Aion 8GB System
 
 ## Given
 
@@ -7,7 +7,7 @@
 | Physical RAM | 8192 MB | /proc/meminfo |
 | Compression algorithm | zstd | zram-generator.conf |
 | Compression ratio (mixed workload) | 2.1:1 | Measured via zramctl |
-| Swappiness | 160 | /etc/sysctl.d/99-nexusos.conf |
+| Swappiness | 160 | /etc/sysctl.d/99-aion.conf |
 | ZRAM allocation | 8192 MB (100% of RAM) | zram-generator.conf |
 | Target free RAM (gaming) | 7 GB | resource-throttler.py |
 
@@ -71,7 +71,7 @@ At 70% ZRAM utilization the system remains stable:
 
 ## 2. Compression Ratios by Data Type
 
-Measured with `zstd -b` on representative NexusOS files:
+Measured with `zstd -b` on representative Aion files:
 
 | Data Type | Ratio | Example Files |
 |-----------|-------|---------------|
@@ -165,7 +165,7 @@ The kernel's `get_scan_count()` determines how aggressively to swap:
 Scan ratio = swappiness × anon_cost / (anon_cost + file_cost)
 
 Where:
-  swappiness = 160 (NexusOS setting, default=60)
+  swappiness = 160 (Aion setting, default=60)
   anon_cost  = relative cost of reclaiming anonymous (ZRAM) pages
   file_cost  = relative cost of reclaiming file-backed (page cache) pages
 ```
@@ -181,7 +181,7 @@ With default swappiness (60):
 60 × A / (A + F) → balanced scan, file cache preferred
 ```
 
-With NexusOS swappiness (160):
+With Aion swappiness (160):
 ```
 160 × A / (A + F) → 2.67× more aggressive anonymous page scanning
 ```

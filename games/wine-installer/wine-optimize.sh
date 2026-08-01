@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-LOG_DIR="/var/log/nexusos"
+LOG_DIR="/var/log/aion"
 LOG_FILE="${LOG_DIR}/wine-optimize.log"
 mkdir -p "$LOG_DIR"
 
@@ -15,7 +15,7 @@ log_error() {
 
 if [ $# -lt 1 ]; then
     echo "Usage: $0 <WINEPREFIX_PATH>"
-    echo "  Optimizes a Wine prefix for gaming on NexusOS."
+    echo "  Optimizes a Wine prefix for gaming on Aion."
     exit 1
 fi
 
@@ -62,7 +62,7 @@ reg add "HKCU\\Software\\Wine\\DllOverrides" /v winefile /t REG_SZ /d disabled /
 reg add "HKCU\\Software\\Wine\\DllOverrides" /v winemenubuilder /t REG_SZ /d disabled /f 2>/dev/null || true
 reg add "HKCU\\Software\\Wine\\DllOverrides" /v wineboot /t REG_SZ /d disabled /f 2>/dev/null || true
 
-ENV_FILE="${WINEPREFIX}/nexusos.env"
+ENV_FILE="${WINEPREFIX}/aion.env"
 log "Writing optimized environment file: ${ENV_FILE}"
 cat > "$ENV_FILE" << 'ENVEOF'
 DXVK_ASYNC=1

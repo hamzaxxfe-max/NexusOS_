@@ -5,7 +5,7 @@
   "resolution": "native",
   "encoder": "vaapi",
   "quality": "balanced",
-  "save_path": "~/Videos/NexusOS-Capture",
+  "save_path": "~/Videos/Aion-Capture",
   "trigger_combo": "Guide+RB",
   "trigger_hold_ms": 2000,
   "pause_wallpaper": true

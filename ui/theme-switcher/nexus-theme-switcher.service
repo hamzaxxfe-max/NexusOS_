@@ -1,5 +1,5 @@
 [Unit]
-Description=NexusOS Theme Switcher
+Description=Aion Theme Switcher
 After=graphical.target
 PartOf=graphical-session.target
 
@@ -7,7 +7,7 @@ PartOf=graphical-session.target
 Type=simple
 Environment=DISPLAY=:0
 Environment=XAUTHORITY=%h/.Xauthority
-ExecStart=/usr/bin/python3 /usr/lib/nexusos/theme-switcher/nexus-theme-switcher.py
+ExecStart=/usr/bin/python3 /usr/lib/aion/theme-switcher/nexus-theme-switcher.py
 Restart=on-failure
 RestartSec=5
 

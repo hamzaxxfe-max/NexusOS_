@@ -13,13 +13,13 @@ from pathlib import Path
 from typing import Optional
 from dataclasses import dataclass, field
 
-LOG_DIR = Path("/var/log/nexusos")
+LOG_DIR = Path("/var/log/aion")
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 LOG_FILE = LOG_DIR / "key-mapper.log"
 
-CONFIG_DIR = Path.home() / ".config" / "nexusos"
+CONFIG_DIR = Path.home() / ".config" / "aion"
 KEYMAPS_FILE = CONFIG_DIR / "keymaps.json"
-ONLINE_PROFILES_URL = "https://raw.githubusercontent.com/nexusos/keyprofiles/main/profiles"
+ONLINE_PROFILES_URL = "https://raw.githubusercontent.com/aion/keyprofiles/main/profiles"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -359,7 +359,7 @@ class KeyMapperDaemon:
             import urllib.request
             import urllib.error
             url = f"{ONLINE_PROFILES_URL}/{package_name}.json"
-            req = urllib.request.Request(url, headers={"User-Agent": "NexusOS-KeyMapper/1.0"})
+            req = urllib.request.Request(url, headers={"User-Agent": "Aion-KeyMapper/1.0"})
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 profile = self._parse_profile(package_name, data)
@@ -397,7 +397,7 @@ class KeyMapperDaemon:
         KEYMAPS_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
     def _setup_devices(self):
-        self.mouse_device = UInputDevice("NexusOS Virtual Mouse")
+        self.mouse_device = UInputDevice("Aion Virtual Mouse")
         self.mouse_device.open()
         self.mouse_device.set_evbit(EV_KEY)
         self.mouse_device.set_evbit(EV_REL)
@@ -408,7 +408,7 @@ class KeyMapperDaemon:
         self.mouse_device.set_relbit(REL_Y)
         self.mouse_device.set_relbit(REL_WHEEL)
 
-        self.keyboard_device = UInputDevice("NexusOS Virtual Keyboard")
+        self.keyboard_device = UInputDevice("Aion Virtual Keyboard")
         self.keyboard_device.open()
         self.keyboard_device.set_evbit(EV_KEY)
         for k in [KEY_W, KEY_A, KEY_S, KEY_D, KEY_SPACE, KEY_LEFTSHIFT,
@@ -416,7 +416,7 @@ class KeyMapperDaemon:
                    KEY_J, KEY_K, KEY_L, KEY_SEMICOLON]:
             self.keyboard_device.set_keybit(k)
 
-        self.gamepad_device = UInputDevice("NexusOS Virtual Gamepad", bustype=0x05)
+        self.gamepad_device = UInputDevice("Aion Virtual Gamepad", bustype=0x05)
         self.gamepad_device.open()
         self.gamepad_device.set_evbit(EV_KEY)
         self.gamepad_device.set_evbit(EV_ABS)
@@ -708,7 +708,7 @@ class KeyMapperDaemon:
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description="NexusOS Key Mapper Daemon")
+    parser = argparse.ArgumentParser(description="Aion Key Mapper Daemon")
     parser.add_argument("--simulate-touch", nargs=4, type=int,
                         metavar=("X", "Y", "SLOT", "DOWN"),
                         help="Simulate a touch event (for testing)")

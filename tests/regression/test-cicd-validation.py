@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NexusOS CI/CD Pipeline Validation Tests
+Aion CI/CD Pipeline Validation Tests
 Verifies all workflow files, build scripts, and deployment configs.
 """
 import json
@@ -18,18 +18,18 @@ if not PIPELINE_FILE.exists():
 PAGES_FILE = DEPLOY_DIR / "pages-deploy.yml"
 if not PAGES_FILE.exists():
     PAGES_FILE = WORKFLOWS_DIR / "pages-deploy.yml"
-BUILDER_SCRIPT = PROJ_ROOT / "NexusOS-Builder.sh"
+BUILDER_SCRIPT = PROJ_ROOT / "Aion-Builder.sh"
 MANIFEST_FILE = OTA_DIR / "manifest.json"
 if not MANIFEST_FILE.exists():
     MANIFEST_FILE = PROJ_ROOT / "manifest.json"
 LICENSE_FILE = PROJ_ROOT / "LICENSE"
 GITIGNORE_FILE = PROJ_ROOT / ".gitignore"
-OTA_SERVICE = OTA_DIR / "nexusos-ota.service"
+OTA_SERVICE = OTA_DIR / "aion-ota.service"
 if not OTA_SERVICE.exists():
-    OTA_SERVICE = PROJ_ROOT / "nexusos-ota.service"
-OTA_TIMER = OTA_DIR / "nexusos-ota.timer"
+    OTA_SERVICE = PROJ_ROOT / "aion-ota.service"
+OTA_TIMER = OTA_DIR / "aion-ota.timer"
 if not OTA_TIMER.exists():
-    OTA_TIMER = PROJ_ROOT / "nexusos-ota.timer"
+    OTA_TIMER = PROJ_ROOT / "aion-ota.timer"
 
 
 def _read_file(path):
@@ -164,8 +164,8 @@ class TestCICDValidation(unittest.TestCase):
             f"Builder script not found at {BUILDER_SCRIPT}"
         )
         content = _read_file(BUILDER_SCRIPT)
-        self.assertIsNotNone(content, "Cannot read NexusOS-Builder.sh")
-        iso_patterns = [r"\.iso", r"iso_output", r"output.*iso", r"NexusOS.*\.iso"]
+        self.assertIsNotNone(content, "Cannot read Aion-Builder.sh")
+        iso_patterns = [r"\.iso", r"iso_output", r"output.*iso", r"Aion.*\.iso"]
         found = any(re.search(p, content, re.IGNORECASE) for p in iso_patterns)
         self.assertTrue(
             found,
@@ -174,7 +174,7 @@ class TestCICDValidation(unittest.TestCase):
 
     def test_builder_script_has_checksum(self):
         content = _read_file(BUILDER_SCRIPT)
-        self.assertIsNotNone(content, "Cannot read NexusOS-Builder.sh")
+        self.assertIsNotNone(content, "Cannot read Aion-Builder.sh")
         self.assertIn(
             "sha256sum", content,
             "Builder script does not generate SHA256 checksums"
@@ -182,7 +182,7 @@ class TestCICDValidation(unittest.TestCase):
 
     def test_builder_script_has_compression(self):
         content = _read_file(BUILDER_SCRIPT)
-        self.assertIsNotNone(content, "Cannot read NexusOS-Builder.sh")
+        self.assertIsNotNone(content, "Cannot read Aion-Builder.sh")
         compression_indicators = ["xz", "zstd", "gzip", "lz4", "lzma"]
         found = any(ind in content.lower() for ind in compression_indicators)
         self.assertTrue(
@@ -192,7 +192,7 @@ class TestCICDValidation(unittest.TestCase):
 
     def test_builder_script_validates_size(self):
         content = _read_file(BUILDER_SCRIPT)
-        self.assertIsNotNone(content, "Cannot read NexusOS-Builder.sh")
+        self.assertIsNotNone(content, "Cannot read Aion-Builder.sh")
         size_indicators = [
             r"stat.*size",
             r"du\s+-[sh]",
@@ -236,14 +236,14 @@ class TestCICDValidation(unittest.TestCase):
             )
 
     def test_ota_service_has_timer(self):
-        timer_path = _find_file("nexusos-ota.timer")
+        timer_path = _find_file("aion-ota.timer")
         if timer_path is None:
-            self.skipTest("nexusos-ota.timer not found")
+            self.skipTest("aion-ota.timer not found")
         content = _read_file(timer_path)
-        self.assertIsNotNone(content, "Cannot read nexusos-ota.timer")
+        self.assertIsNotNone(content, "Cannot read aion-ota.timer")
         self.assertIn(
             "OnUnitActiveSec", content,
-            "nexusos-ota.timer missing OnUnitActiveSec directive"
+            "aion-ota.timer missing OnUnitActiveSec directive"
         )
 
     def test_gitignore_excludes_build(self):
@@ -322,7 +322,7 @@ class TestCICDValidation(unittest.TestCase):
             f"Builder script not found at {BUILDER_SCRIPT}"
         )
         content = _read_file(BUILDER_SCRIPT)
-        self.assertIsNotNone(content, "Cannot read NexusOS-Builder.sh")
+        self.assertIsNotNone(content, "Cannot read Aion-Builder.sh")
         self.assertTrue(
             content.strip().startswith("#!/"),
             "Builder script does not have a shebang line"
@@ -362,19 +362,19 @@ class TestCICDValidation(unittest.TestCase):
             )
 
     def test_ota_service_wants_dependency(self):
-        service_path = _find_file("nexusos-ota.service")
+        service_path = _find_file("aion-ota.service")
         if service_path is None:
-            self.skipTest("nexusos-ota.service not found")
+            self.skipTest("aion-ota.service not found")
         content = _read_file(service_path)
-        self.assertIsNotNone(content, "Cannot read nexusos-ota.service")
+        self.assertIsNotNone(content, "Cannot read aion-ota.service")
         self.assertIn(
             "[Install]", content,
-            "nexusos-ota.service missing [Install] section"
+            "aion-ota.service missing [Install] section"
         )
         has_wanted = bool(re.search(r"WantedBy\s*=", content))
         self.assertTrue(
             has_wanted,
-            "nexusos-ota.service missing WantedBy in [Install] section"
+            "aion-ota.service missing WantedBy in [Install] section"
         )
 
 

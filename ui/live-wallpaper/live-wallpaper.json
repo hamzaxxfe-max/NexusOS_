@@ -1,7 +1,7 @@
 {
   "enabled": true,
-  "wallpaper_dir": "/usr/share/nexusos/live-wallpapers",
-  "user_wallpaper_dir": "~/Videos/NexusOS-Wallpapers",
+  "wallpaper_dir": "/usr/share/aion/live-wallpapers",
+  "user_wallpaper_dir": "~/Videos/Aion-Wallpapers",
   "current_wallpaper": "",
   "playback_mode": "single",
   "cycle_interval_sec": 300,

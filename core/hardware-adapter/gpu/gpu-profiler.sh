@@ -1,6 +1,6 @@
 #!/bin/bash
 set -euo pipefail
-# NexusOS GPU Profiler — Detect and profile all GPU hardware
+# Aion GPU Profiler — Detect and profile all GPU hardware
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -8,9 +8,9 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-CONFIG_DIR="/etc/nexusos"
+CONFIG_DIR="/etc/aion"
 OUTPUT_FILE="${CONFIG_DIR}/gpu-profile.json"
-LOG_FILE="/var/log/nexusos/gpu-profiler.log"
+LOG_FILE="/var/log/aion/gpu-profiler.log"
 
 log_info()  { echo -e "${CYAN}[INFO]${NC} $(date '+%H:%M:%S') $*"; echo "[INFO] $(date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG_FILE"; }
 log_warn()  { echo -e "${YELLOW}[WARN]${NC} $(date '+%H:%M:%S') $*"; echo "[WARN] $(date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG_FILE"; }
@@ -247,7 +247,7 @@ EOF
 }
 
 main() {
-    log_info "=== NexusOS GPU Profiler starting ==="
+    log_info "=== Aion GPU Profiler starting ==="
     read -r primary_vendor max_vram gpu_count <<< "$(detect_all_gpus)"
     output_json "$primary_vendor" "$max_vram" "$gpu_count"
     log_info "=== GPU Profiler complete ==="

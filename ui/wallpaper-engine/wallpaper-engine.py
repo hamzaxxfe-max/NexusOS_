@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NexusOS Wallpaper & Accent Color Engine — System Tray Manager."""
+"""Aion Wallpaper & Accent Color Engine — System Tray Manager."""
 
 import fcntl
 import json
@@ -57,15 +57,15 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-APP_NAME = "NexusOS Wallpaper Engine"
+APP_NAME = "Aion Wallpaper Engine"
 APP_VERSION = "1.0.0"
-CONFIG_DIR = Path.home() / ".config" / "nexusos"
+CONFIG_DIR = Path.home() / ".config" / "aion"
 CONFIG_FILE = CONFIG_DIR / "wallpaper-engine.json"
 LOCK_FILE = CONFIG_DIR / "wallpaper-engine.lock"
 THUMB_DIR = CONFIG_DIR / "thumbnails"
 
 WALLPAPER_DIRS = [
-    Path("/usr/share/nexusos/wallpapers"),
+    Path("/usr/share/aion/wallpapers"),
     Path.home() / "Pictures" / "Wallpapers",
 ]
 
@@ -172,7 +172,7 @@ def apply_kwin_color_scheme(color_hex: str) -> bool:
 
 def apply_xresources(color_hex: str) -> bool:
     r, g, b = _hex_to_rgb(color_hex)
-    xresource = f"nexusos.accent_color: #{color_hex.lstrip('#')}\n"
+    xresource = f"aion.accent_color: #{color_hex.lstrip('#')}\n"
     xresource += f"*color12: #{color_hex.lstrip('#')}\n"
     try:
         with tempfile.NamedTemporaryFile(mode="w", suffix=".Xresources",
@@ -528,7 +528,7 @@ class WallpaperEngineWindow(QMainWindow):
         main_layout.setSpacing(10)
 
         header = QLabel(f"<span style='font-size:22px;font-weight:bold;color:#00D2FF;'>"
-                        f"NexusOS Wallpaper Engine</span>"
+                        f"Aion Wallpaper Engine</span>"
                         f"<span style='font-size:12px;color:#888888;'> v{APP_VERSION}</span>")
         main_layout.addWidget(header)
 

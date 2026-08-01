@@ -1,11 +1,11 @@
-# Btrfs Compression Mathematical Proof — NexusOS
+# Btrfs Compression Mathematical Proof — Aion
 
 ## Given
 
 | Parameter | Value | Source |
 |-----------|-------|--------|
 | Drive size | 1 TB (1,000,000,000,000 bytes) | /dev/sdX |
-| Mount point | /mnt/nexusos-games | fstab |
+| Mount point | /mnt/aion-games | fstab |
 | Compression algorithm | zstd | mount options |
 | Compression level | 3 | compress-force=zstd:3 |
 | Filesystem | Btrfs | mkfs.btrfs |
@@ -17,7 +17,7 @@
 | Level | Speed (compress) | Speed (decompress) | Ratio | Use Case |
 |-------|-----------------|-------------------|-------|----------|
 | 1 | 800 MB/s | 2.0 GB/s | 2.0:1 | Fast (ZRAM default) |
-| 3 | 500 MB/s | 1.2 GB/s | 2.4:1 | Balanced (NexusOS) |
+| 3 | 500 MB/s | 1.2 GB/s | 2.4:1 | Balanced (Aion) |
 | 5 | 300 MB/s | 1.1 GB/s | 2.7:1 | Higher ratio |
 | 10 | 100 MB/s | 0.9 GB/s | 3.1:1 | Maximum ratio |
 | 19 | 25 MB/s | 0.8 GB/s | 3.4:1 | Ultra (offline only) |

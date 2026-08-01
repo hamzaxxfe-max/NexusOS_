@@ -1,6 +1,6 @@
 #!/bin/bash
 set -euo pipefail
-# NexusOS Storage Optimizer — Detect storage, set schedulers, optimize Btrfs
+# Aion Storage Optimizer — Detect storage, set schedulers, optimize Btrfs
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -8,9 +8,9 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-CONFIG_DIR="/etc/nexusos"
+CONFIG_DIR="/etc/aion"
 OUTPUT_FILE="${CONFIG_DIR}/storage-profile.json"
-LOG_FILE="/var/log/nexusos/storage-optimizer.log"
+LOG_FILE="/var/log/aion/storage-optimizer.log"
 
 log_info()  { echo -e "${CYAN}[INFO]${NC} $(date '+%H:%M:%S') $*"; echo "[INFO] $(date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG_FILE"; }
 log_warn()  { echo -e "${YELLOW}[WARN]${NC} $(date '+%H:%M:%S') $*"; echo "[WARN] $(date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG_FILE"; }
@@ -204,7 +204,7 @@ EOF
 }
 
 main() {
-    log_info "=== NexusOS Storage Optimizer starting ==="
+    log_info "=== Aion Storage Optimizer starting ==="
     local devices_str
     devices_str=$(detect_devices)
     if [ -z "$devices_str" ]; then

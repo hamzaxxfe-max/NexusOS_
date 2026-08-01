@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NexusOS Theme Switcher — Console Mode side-car overlay."""
+"""Aion Theme Switcher — Console Mode side-car overlay."""
 
 import configparser
 import glob
@@ -67,12 +67,12 @@ from PyQt6.QtWidgets import (
 # Constants
 # ---------------------------------------------------------------------------
 
-APP_NAME = "NexusOS Theme Switcher"
+APP_NAME = "Aion Theme Switcher"
 APP_VERSION = "2.1.0"
 APP_ID = "org.nexusui.theme-switcher"
 LOCK_FILE = Path(tempfile.gettempdir()) / "nexus-theme-switcher.lock"
-PID_FILE = Path("/tmp/nexusos-console.pid")
-FRONTEND_LOG = Path(tempfile.gettempdir()) / "nexusos-frontend.log"
+PID_FILE = Path("/tmp/aion-console.pid")
+FRONTEND_LOG = Path(tempfile.gettempdir()) / "aion-frontend.log"
 
 NEXUS_DARK_BG = "#121212"
 NEXUS_PANEL = "#1A2238"
@@ -271,8 +271,8 @@ def apply_macos_style() -> str:
     write_ini(KWINRC, "Windows", "BorderlessMaximizeWindows", "false")
     write_ini(KDEGLOBALS, "KWin", "BorderlessMaximizeWindows", "false")
 
-    write_ini(PLASMARC, "Theme", "name", "NexusOS-Dark")
-    messages.append("Theme set to NexusOS-Dark")
+    write_ini(PLASMARC, "Theme", "name", "Aion-Dark")
+    messages.append("Theme set to Aion-Dark")
 
     restart_plasmashell()
     messages.append("plasmashell restarted")
@@ -325,6 +325,36 @@ def apply_console_style() -> str:
         messages.append("No frontend binary found — install pegasus-fe, steam, or emulationstation")
 
     return "; ".join(messages)
+
+
+def _apply_flatpak_theme_override() -> None:
+    """Grant Flatpak apps read access to user themes and icons.
+
+    Without this, Flatpak apps (Steam, Heroic, Bottles, etc.) cannot see
+    user-installed themes in ~/.themes or ~/.local/share/icons.
+    """
+    import subprocess as _sp
+
+    overrides = [
+        ["flatpak", "override", "--global",
+         "--filesystem=$HOME/.themes:ro"],
+        ["flatpak", "override", "--global",
+         "--filesystem=$HOME/.local/share/themes:ro"],
+        ["flatpak", "override", "--global",
+         "--filesystem=$HOME/.icons:ro"],
+        ["flatpak", "override", "--global",
+         "--filesystem=$HOME/.local/share/icons:ro"],
+        ["flatpak", "override", "--global",
+         "--env=GTK_THEME=Aion-Dark"],
+    ]
+
+    for cmd in overrides:
+        try:
+            _sp.run(cmd, capture_output=True, timeout=10)
+        except (_sp.TimeoutExpired, FileNotFoundError):
+            pass
+
+    log.info("Flatpak theme overrides applied")
 
 
 # ---------------------------------------------------------------------------
@@ -1084,6 +1114,9 @@ class ThemesTab(QWidget):
         self._status.setText(f"Applied: {result}")
         self._status.setStyleSheet(f"color: {NEXUS_SUCCESS}; font-size: 8pt;")
 
+        # Grant Flatpak apps read access to user themes
+        _apply_flatpak_theme_override()
+
 
 # ---------------------------------------------------------------------------
 # Tab 2: Console Mode
@@ -1410,7 +1443,7 @@ class AboutTab(QWidget):
         root.setContentsMargins(20, 16, 20, 16)
         root.setSpacing(12)
 
-        heading = QLabel("About NexusOS Theme Switcher")
+        heading = QLabel("About Aion Theme Switcher")
         heading.setObjectName("heading")
         root.addWidget(heading)
 
@@ -1433,7 +1466,7 @@ class AboutTab(QWidget):
 
         # Description
         desc = QLabel(
-            "NexusOS Theme Switcher provides one-click desktop layout presets "
+            "Aion Theme Switcher provides one-click desktop layout presets "
             "for KDE Plasma, including a full-screen Console Mode with gamepad "
             "support for gaming frontends like Pegasus, Steam Big Picture, and "
             "EmulationStation."
@@ -1489,7 +1522,7 @@ class AboutTab(QWidget):
         cc_layout = QVBoxLayout(credits_card)
         cc_layout.setContentsMargins(16, 12, 16, 12)
         cc_layout.setSpacing(4)
-        cc_label = QLabel("NexusOS Project  •  Licensed under GPL-3.0  •  Built with PyQt6")
+        cc_label = QLabel("Aion Project  •  Licensed under GPL-3.0  •  Built with PyQt6")
         cc_label.setStyleSheet(f"font-size: 8pt; color: {NEXUS_TEXT_DIM};")
         cc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         cc_layout.addWidget(cc_label)

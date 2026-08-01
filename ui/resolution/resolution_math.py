@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NexusOS Resolution and DPI Scaling Engine.
+Aion Resolution and DPI Scaling Engine.
 All UI dimensions are derived from this module to ensure pixel-perfect
 layout across ALL screen sizes, aspect ratios, and DPI settings.
 """

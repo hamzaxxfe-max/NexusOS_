@@ -1,17 +1,21 @@
 #!/usr/bin/env python3
 """
-NexusOS UI Alignment Validation Suite
+Aion UI Alignment Validation Suite
 Tests all PyQt6 UI components at multiple virtual resolutions
 to ensure zero clipping, zero overlap, zero truncation.
 """
 import unittest
 from unittest.mock import MagicMock, PropertyMock
-from PyQt6.QtCore import QRect, QSize, Qt, QPoint
-from PyQt6.QtGui import QFont, QFontMetrics, QGuiApplication
-from PyQt6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QHBoxLayout,
-    QGridLayout, QLabel, QTabWidget, QScrollArea
-)
+try:
+    from PyQt6.QtCore import QRect, QSize, Qt, QPoint
+    from PyQt6.QtGui import QFont, QFontMetrics, QGuiApplication
+    from PyQt6.QtWidgets import (
+        QApplication, QWidget, QVBoxLayout, QHBoxLayout,
+        QGridLayout, QLabel, QTabWidget, QScrollArea
+    )
+    HAS_PYQT6 = True
+except ImportError:
+    HAS_PYQT6 = False
 import sys
 
 PROJ_ROOT = __import__("pathlib").Path(__file__).resolve().parents[2]
@@ -70,6 +74,7 @@ RESOLUTIONS = [
 ]
 
 
+@unittest.skipUnless(HAS_PYQT6, "PyQt6 not installed — skipping UI alignment tests")
 class TestUIAlignment(unittest.TestCase):
 
     @classmethod
@@ -375,7 +380,7 @@ class TestUIAlignment(unittest.TestCase):
         layout = QVBoxLayout(container)
         layout.setContentsMargins(24, 24, 24, 24)
         labels_text = [
-            "Theme Switcher", "Light", "Dark", "NexusOS",
+            "Theme Switcher", "Light", "Dark", "Aion",
             "System Tweaks", "Graphics", "Audio",
             "Game Capture", "Source", "FPS",
             "Start Capture", "Cancel", "Drop .exe here",
@@ -506,7 +511,7 @@ class TestUIAlignment(unittest.TestCase):
                 main = QVBoxLayout(container)
                 main.setContentsMargins(24, 24, 24, 24)
                 main.setSpacing(16)
-                header = QLabel("NexusOS Settings")
+                header = QLabel("Aion Settings")
                 header.setFixedHeight(48)
                 main.addWidget(header)
                 tabs = QTabWidget()

@@ -1,0 +1,14 @@
+[Unit]
+Description=Aion GPU Profiler
+After=multi-user.target
+Wants=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash /opt/aion/core/hardware-adapter/gpu/gpu-profiler.sh
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

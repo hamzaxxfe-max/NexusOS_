@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# NexusOS Icon Manager — unified game icon extraction, glow, and indexing.
+# Aion Icon Manager — unified game icon extraction, glow, and indexing.
 set -euo pipefail
 
 readonly VERSION="1.0.0"
-readonly GAME_DIRS=("/opt/nexusos/games")
-readonly ICON_DIR="${HOME}/.local/share/nexusos/icons"
-readonly INDEX_FILE="${HOME}/.config/nexusos/game-grid.json"
-readonly DEFAULT_ICON="${HOME}/.local/share/nexusos/icons/_default_gamepad.png"
-readonly TEMP_DIR=$(mktemp -d /tmp/nexusos-icons.XXXXXX)
+readonly GAME_DIRS=("/opt/aion/games")
+readonly ICON_DIR="${HOME}/.local/share/aion/icons"
+readonly INDEX_FILE="${HOME}/.config/aion/game-grid.json"
+readonly DEFAULT_ICON="${HOME}/.local/share/aion/icons/_default_gamepad.png"
+readonly TEMP_DIR=$(mktemp -d /tmp/aion-icons.XXXXXX)
 readonly GLOW_COLOR="#00D2FF"
 readonly GLOW_RADIUS="4"
 readonly ICON_SIZE="512"
@@ -123,8 +123,8 @@ extract_apk_icon() {
 # ---------------------------------------------------------------------------
 generate_default_icon() {
     mkdir -p "$(dirname "$DEFAULT_ICON")"
-    if [[ -f "${HOME}/.local/share/nexusos/icons/default-gamepad.svg" ]]; then
-        convert "${HOME}/.local/share/nexusos/icons/default-gamepad.svg" \
+    if [[ -f "${HOME}/.local/share/aion/icons/default-gamepad.svg" ]]; then
+        convert "${HOME}/.local/share/aion/icons/default-gamepad.svg" \
             -resize "${ICON_SIZE}x${ICON_SIZE}" \
             PNG:"${DEFAULT_ICON}" 2>/dev/null
     elif command -v rsvg-convert &>/dev/null; then
@@ -235,7 +235,7 @@ process_desktop() {
     fi
 
     local search_dirs=()
-    for dir in "/opt/nexusos/games" "/usr/share/icons" "${HOME}/.local/share/icons"; do
+    for dir in "/opt/aion/games" "/usr/share/icons" "${HOME}/.local/share/icons"; do
         [[ -d "$dir" ]] && search_dirs+=("$dir")
     done
 
@@ -365,7 +365,7 @@ apply_glow_all() {
 # ---------------------------------------------------------------------------
 usage() {
     cat <<EOF
-NexusOS Icon Manager v${VERSION}
+Aion Icon Manager v${VERSION}
 
 Usage: $(basename "$0") [OPTIONS]
 
@@ -384,7 +384,7 @@ Examples:
   $(basename "$0") --refresh --apply-glow  # Full rebuild + glow
 
 Directories scanned:
-  /opt/nexusos/games/*.desktop
+  /opt/aion/games/*.desktop
 
 Icons output:
   ${ICON_DIR}/
@@ -417,7 +417,7 @@ main() {
             --scan)         do_scan=true; do_glow=true ;;
             --default-icon) do_default=true ;;
             --help|-h)      usage; exit 0 ;;
-            --version|-v)   echo "NexusOS Icon Manager v${VERSION}"; exit 0 ;;
+            --version|-v)   echo "Aion Icon Manager v${VERSION}"; exit 0 ;;
             *)              die "Unknown option: $1 (use --help)" ;;
         esac
         shift

@@ -1,14 +1,14 @@
-# NexusOS GitHub Pages Deployment Guide
+# Aion GitHub Pages Deployment Guide
 
 ## Overview
 
-This guide covers deploying the NexusOS website to GitHub Pages at `https://<username>.github.io/nexusos/`. The site serves as the public-facing landing page, documentation hub, and download portal for NexusOS ISO images hosted via GitHub Releases.
+This guide covers deploying the Aion website to GitHub Pages at `https://<username>.github.io/aion/`. The site serves as the public-facing landing page, documentation hub, and download portal for Aion ISO images hosted via GitHub Releases.
 
 ## Prerequisites
 
 - GitHub account with Pages enabled
 - Git installed locally
-- NexusOS repository on GitHub
+- Aion repository on GitHub
 - Release pipeline configured (see `release-pipeline.yml`)
 
 ## 1. Repository Setup
@@ -16,14 +16,14 @@ This guide covers deploying the NexusOS website to GitHub Pages at `https://<use
 ### Create the Repository
 
 ```bash
-# Create repository named nexusos (or nexusos-website for a separate repo)
-gh repo create username/nexusos --public --description "NexusOS - Immutable Linux Distribution"
+# Create repository named aion (or aion-website for a separate repo)
+gh repo create username/aion --public --description "Aion - Immutable Linux Distribution"
 ```
 
 ### Directory Structure
 
 ```
-nexusos/
+aion/
 ├── website/                  # Static site source
 │   ├── index.html            # Landing page
 │   ├── css/
@@ -48,8 +48,8 @@ nexusos/
 │   │   └── build-iso.sh
 │   └── ota/
 │       ├── ota-updater.py
-│       ├── nexusos-ota.service
-│       └── nexusos-ota.timer
+│       ├── aion-ota.service
+│       └── aion-ota.timer
 └── .github/
     └── workflows/
         ├── pages-deploy.yml
@@ -66,21 +66,21 @@ nexusos/
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NexusOS - Immutable Linux Distribution</title>
+    <title>Aion - Immutable Linux Distribution</title>
     <link rel="stylesheet" href="css/style.css">
-    <meta name="description" content="NexusOS is an immutable, snapshot-based Linux distribution with atomic updates and rollback support.">
-    <meta property="og:title" content="NexusOS">
+    <meta name="description" content="Aion is an immutable, snapshot-based Linux distribution with atomic updates and rollback support.">
+    <meta property="og:title" content="Aion">
     <meta property="og:description" content="Immutable Linux Distribution with atomic updates">
     <meta property="og:type" content="website">
 </head>
 <body>
     <header>
         <nav>
-            <a href="/" class="logo">NexusOS</a>
+            <a href="/" class="logo">Aion</a>
             <ul>
-                <li><a href="/nexusos/docs/">Docs</a></li>
-                <li><a href="/nexusos/downloads/">Downloads</a></li>
-                <li><a href="https://github.com/username/nexusos">GitHub</a></li>
+                <li><a href="/aion/docs/">Docs</a></li>
+                <li><a href="/aion/downloads/">Downloads</a></li>
+                <li><a href="https://github.com/username/aion">GitHub</a></li>
             </ul>
         </nav>
     </header>
@@ -88,7 +88,7 @@ nexusos/
         <section class="hero">
             <h1>Immutable Linux. Zero Downtime.</h1>
             <p>Btrfs snapshot-based updates with atomic rollback. Update without fear.</p>
-            <a href="/nexusos/downloads/" class="btn-primary">Download NexusOS 1.0.0</a>
+            <a href="/aion/downloads/" class="btn-primary">Download Aion 1.0.0</a>
         </section>
         <section class="features">
             <div class="feature">
@@ -123,22 +123,22 @@ This page fetches the manifest.json to display current versions and download lin
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Downloads - NexusOS</title>
+    <title>Downloads - Aion</title>
     <link rel="stylesheet" href="../css/style.css">
 </head>
 <body>
     <header>
         <nav>
-            <a href="/nexusos/" class="logo">NexusOS</a>
+            <a href="/aion/" class="logo">Aion</a>
             <ul>
                 <li><a href="../docs/">Docs</a></li>
                 <li><a href="../downloads/">Downloads</a></li>
-                <li><a href="https://github.com/username/nexusos">GitHub</a></li>
+                <li><a href="https://github.com/username/aion">GitHub</a></li>
             </ul>
         </nav>
     </header>
     <main>
-        <h1>Download NexusOS</h1>
+        <h1>Download Aion</h1>
         <div id="download-cards"></div>
         <div id="version-info"></div>
     </main>
@@ -150,7 +150,7 @@ This page fetches the manifest.json to display current versions and download lin
 ### JavaScript for Dynamic Downloads (website/js/main.js)
 
 ```javascript
-const MANIFEST_URL = 'https://raw.githubusercontent.com/username/nexusos/main/manifest.json';
+const MANIFEST_URL = 'https://raw.githubusercontent.com/username/aion/main/manifest.json';
 
 async function loadDownloads() {
     const container = document.getElementById('download-cards');
@@ -163,7 +163,7 @@ async function loadDownloads() {
         const card = document.createElement('div');
         card.className = 'download-card';
         card.innerHTML = `
-            <h2>NexusOS ${manifest.latest_version}</h2>
+            <h2>Aion ${manifest.latest_version}</h2>
             <p class="release-date">${new Date(manifest.release_date).toLocaleDateString()}</p>
             <p class="release-notes">${manifest.release_notes}</p>
             <a href="${manifest.download_url}" class="btn-primary" download>
@@ -185,7 +185,7 @@ async function loadDownloads() {
             `;
         }
     } catch (err) {
-        container.innerHTML = '<p>Failed to load release information. <a href="https://github.com/username/nexusos/releases">View releases on GitHub.</a></p>';
+        container.innerHTML = '<p>Failed to load release information. <a href="https://github.com/username/aion/releases">View releases on GitHub.</a></p>';
     }
 }
 
@@ -211,7 +211,7 @@ Tag push (v1.0.0)
 ```json
 {
     "latest_version": "1.0.0",
-    "download_url": "https://github.com/username/nexusos/releases/download/v1.0.0/nexusos-1.0.0.iso",
+    "download_url": "https://github.com/username/aion/releases/download/v1.0.0/aion-1.0.0.iso",
     "sha256": "a1b2c3d4e5f6...",
     "release_date": "2026-07-27T00:00:00Z",
     "release_notes": "Initial stable release",
@@ -221,7 +221,7 @@ Tag push (v1.0.0)
         {
             "from_version": "0.9.0",
             "to_version": "1.0.0",
-            "patch_url": "https://github.com/username/nexusos/releases/download/v1.0.0/patch-0.9.0-to-1.0.0.xdelta",
+            "patch_url": "https://github.com/username/aion/releases/download/v1.0.0/patch-0.9.0-to-1.0.0.xdelta",
             "sha256": "f7e8d9c0b1a2...",
             "size": 340
         }
@@ -309,7 +309,7 @@ git push origin v1.0.0
 2. Runs `build-iso.sh` to produce the ISO image
 3. Generates `SHA256SUMS` file containing checksums
 4. Creates a GitHub Release using `softprops/action-gh-release`
-5. Uploads `nexusos-{version}.iso` and `SHA256SUMS` as release assets
+5. Uploads `aion-{version}.iso` and `SHA256SUMS` as release assets
 6. Updates `manifest.json` with the new version, download URL, and checksum
 7. Commits and pushes the updated manifest to main
 
@@ -329,7 +329,7 @@ The ISO build script is at `deploy/github/build-iso.sh`. It uses `mkarchiso` to 
 sudo bash deploy/github/build-iso.sh
 ```
 
-The script reads the version from the repository tag or defaults to `0.0.0-dev`. Output goes to `build/nexusos-{version}.iso`.
+The script reads the version from the repository tag or defaults to `0.0.0-dev`. Output goes to `build/aion-{version}.iso`.
 
 ## 7. Custom Domain Setup (Optional)
 
@@ -345,18 +345,18 @@ Add these DNS records with your domain registrar:
 | A     | @     | 185.199.111.153              | 3600  |
 | CNAME | www   | username.github.io           | 3600  |
 
-For a subdomain like `nexusos.example.com`:
+For a subdomain like `aion.example.com`:
 
 | Type  | Name     | Value                        | TTL   |
 |-------|----------|------------------------------|-------|
-| CNAME | nexusos  | username.github.io           | 3600  |
+| CNAME | aion  | username.github.io           | 3600  |
 
 ### Step 2: Add CNAME File
 
 Create `website/CNAME` with your domain:
 
 ```
-nexusos.example.com
+aion.example.com
 ```
 
 ### Step 3: Configure in GitHub
@@ -372,7 +372,7 @@ Update the `download_url` in `manifest.json` to use your custom domain:
 
 ```json
 {
-    "download_url": "https://nexusos.example.com/releases/nexusos-1.0.0.iso"
+    "download_url": "https://aion.example.com/releases/aion-1.0.0.iso"
 }
 ```
 
@@ -382,7 +382,7 @@ Note: This requires hosting the ISO files yourself or keeping GitHub Releases as
 
 After deployment, verify:
 
-- [ ] Site loads at `https://username.github.io/nexusos/`
+- [ ] Site loads at `https://username.github.io/aion/`
 - [ ] Landing page renders correctly
 - [ ] Documentation pages are accessible
 - [ ] Downloads page loads manifest.json
@@ -409,7 +409,7 @@ Check the Actions tab for workflow run logs. Common issues:
 ### Custom Domain Not Working
 
 - DNS propagation can take up to 24 hours
-- Verify DNS records using `dig nexusos.example.com`
+- Verify DNS records using `dig aion.example.com`
 - Ensure the CNAME file contains only the domain name
 - Re-save the custom domain in GitHub settings
 

@@ -1,0 +1,12 @@
+[Unit]
+Description=Aion OTA Update Timer
+Documentation=https://aion.dev/docs/updates
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=6h
+Persistent=true
+RandomizedDelaySec=30min
+
+[Install]
+WantedBy=timers.target

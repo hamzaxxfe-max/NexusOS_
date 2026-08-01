@@ -1,0 +1,38 @@
+[Unit]
+Description=Aion Resource Throttler
+Documentation=https://aion.dev/docs/performance/throttler
+After=multi-user.target systemd-resolved.service
+Wants=systemd-resolved.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/aion/performance/throttler/resource-throttler.py
+ExecStartPre=/usr/bin/mkdir -p /sys/fs/cgroup/aion-gaming.slice
+ExecStartPre=/usr/bin/mkdir -p /sys/fs/cgroup/aion-install.slice
+ExecStop=/bin/kill -SIGTERM $MAINPID
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=aion-throttler
+
+User=root
+Group=root
+
+ProtectSystem=strict
+ReadWritePaths=/sys/fs/cgroup /var/log/aion /proc/sys/vm /etc/aion
+ProtectHome=read-only
+NoNewPrivileges=no
+CapabilityBoundingSet=CAP_SYS_ADMIN CAP_NET_RAW CAP_DAC_READ_SEARCH
+AmbientCapabilities=CAP_SYS_ADMIN CAP_NET_RAW CAP_DAC_READ_SEARCH
+
+CPUQuota=50%
+MemoryMax=256M
+MemoryHigh=128M
+
+Environment=PYTHONUNBUFFERED=1
+Environment=AION_CONFIG=/etc/aion/config.json
+Environment=AION_LOG=/var/log/aion/resource-throttler.log
+
+[Install]
+WantedBy=multi-user.target

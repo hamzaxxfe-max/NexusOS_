@@ -29,12 +29,12 @@ from PyQt6.QtWidgets import (
 
 APP_NAME = "Nexus Tweak Hub"
 APP_VERSION = "1.0.0"
-CONFIG_DIR = Path.home() / ".config" / "nexusos"
+CONFIG_DIR = Path.home() / ".config" / "aion"
 PROFILE_DIR = CONFIG_DIR / "keymaps"
-NEXUSOS_GAMES = Path("/opt/nexusos/games")
+AION_GAMES = Path("/opt/aion/games")
 USER_GAMES = Path.home() / "Games"
-GPU_STATS_PATH = Path("/tmp/nexusos-gpu-stats.json")
-REMOTE_PROFILES_URL = "https://raw.githubusercontent.com/nexusos-profiles/nexusos-profiles/main/index.json"
+GPU_STATS_PATH = Path("/tmp/aion-gpu-stats.json")
+REMOTE_PROFILES_URL = "https://raw.githubusercontent.com/aion-profiles/aion-profiles/main/index.json"
 WARN_FREQ_RATIO = 1.1
 WARN_UV_MV = -150
 
@@ -721,8 +721,8 @@ class StorageTab(QWidget):
     def _detect_games(self):
         self.game_dirs.clear()
         dirs_to_scan = []
-        if NEXUSOS_GAMES.exists():
-            dirs_to_scan.append(NEXUSOS_GAMES)
+        if AION_GAMES.exists():
+            dirs_to_scan.append(AION_GAMES)
         if USER_GAMES.exists():
             dirs_to_scan.append(USER_GAMES)
         home_games = Path.home() / ".local" / "share" / "Steam" / "steamapps" / "common"
@@ -802,7 +802,7 @@ class StorageTab(QWidget):
     def _start_scrub(self):
         reply = QMessageBox.question(
             self, "Btrfs Scrub",
-            "Start a filesystem scrub on /mnt/nexusos-games?\nThis verifies data integrity.",
+            "Start a filesystem scrub on /mnt/aion-games?\nThis verifies data integrity.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply != QMessageBox.StandardButton.Yes:
@@ -810,10 +810,10 @@ class StorageTab(QWidget):
         self.status_lbl.setText("Starting scrub...")
         self.progress.setValue(20)
         QApplication.processEvents()
-        out, rc = run_cmd("pkexec btrfs scrub start /mnt/nexusos-games", timeout=30)
+        out, rc = run_cmd("pkexec btrfs scrub start /mnt/aion-games", timeout=30)
         self.progress.setValue(100)
         if rc == 0:
-            self.status_lbl.setText("Scrub started. Check: btrfs scrub status /mnt/nexusos-games")
+            self.status_lbl.setText("Scrub started. Check: btrfs scrub status /mnt/aion-games")
         else:
             self.status_lbl.setText(f"Scrub failed: {out[:60]}")
 
@@ -1001,7 +1001,7 @@ class CommunityTab(QWidget):
             QMessageBox.warning(self, "Error", f"Failed to read: {e}")
             return
         share_data = {
-            "nexusos_profile": True,
+            "aion_profile": True,
             "version": "1.0",
             "name": data.get("name", profile_path.stem),
             "game": data.get("game", "Unknown"),

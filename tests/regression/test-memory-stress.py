@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NexusOS Memory & Performance Regression Tests
+Aion Memory & Performance Regression Tests
 Validates idle RAM usage stays below 400MB and capture daemon
 pauses wallpaper during fullscreen.
 """
@@ -16,9 +16,9 @@ from unittest.mock import patch, MagicMock
 PROJ_ROOT = Path(__file__).resolve().parents[2]
 PROC_MEMINFO = Path("/proc/meminfo")
 ZRAM_BASE = Path("/sys/block/zram0")
-CGROUP_BASE = Path("/sys/fs/cgroup/nexusos-gaming.slice")
+CGROUP_BASE = Path("/sys/fs/cgroup/aion-gaming.slice")
 BTRFS_DF_CMD = ["btrfs", "filesystem", "df", "/"]
-CAPTURE_TMPFS = Path("/tmp/nexusos-capture")
+CAPTURE_TMPFS = Path("/tmp/aion-capture")
 MEMINFO_PATHS = {
     "mem_total": "/proc/meminfo",
     "mem_available": "/proc/meminfo",

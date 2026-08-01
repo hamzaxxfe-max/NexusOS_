@@ -15,7 +15,7 @@ import collections
 from pathlib import Path
 from datetime import datetime
 
-CONFIG_PATH = Path("/etc/nexusos/capture-config.json")
+CONFIG_PATH = Path("/etc/aion/capture-config.json")
 DEFAULT_CONFIG = {
     "enabled": True,
     "buffer_seconds": 30,
@@ -23,14 +23,14 @@ DEFAULT_CONFIG = {
     "resolution": "native",
     "encoder": "vaapi",
     "quality": "balanced",
-    "save_path": "~/Videos/NexusOS-Capture",
+    "save_path": "~/Videos/Aion-Capture",
     "trigger_combo": "Guide+RB",
     "trigger_hold_ms": 2000,
     "pause_wallpaper": True,
 }
-LOG_DIR = Path("/var/log/nexusos")
+LOG_DIR = Path("/var/log/aion")
 LOG_PATH = LOG_DIR / "game-capture.log"
-SEGMENT_DIR = Path("/tmp/nexusos-capture")
+SEGMENT_DIR = Path("/tmp/aion-capture")
 VAAPI_DEVICE = "/dev/dri/renderD128"
 WALLPAPER_PROCS = ["wallpaper-engine", "swww", "mpvpaper", "swaybg", "hyprpaper"]
 GAME_PATTERNS = [
@@ -430,7 +430,7 @@ class CaptureEngine:
 
     def _send_notification(self, message):
         out, rc = run_cmd(
-            f"notify-send -a 'NexusOS Game Capture' -i camera-video "
+            f"notify-send -a 'Aion Game Capture' -i camera-video "
             f"-u normal -t 5000 'Game Capture' '{message}' 2>/dev/null"
         )
         if rc != 0:
@@ -692,7 +692,7 @@ class GameCaptureDaemon:
     def run(self):
         setup_logging()
         logger.info("=" * 60)
-        logger.info("NexusOS Game Capture Daemon v1.0 starting")
+        logger.info("Aion Game Capture Daemon v1.0 starting")
         logger.info(f"Config: {CONFIG_PATH}")
         logger.info(f"Encoder: {self.config['encoder']}")
         logger.info(f"Buffer: {self.config['buffer_seconds']}s @ {self.config['fps']}fps")
