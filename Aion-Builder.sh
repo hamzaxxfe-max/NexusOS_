@@ -383,10 +383,6 @@ Server = https://mirror.rackspace.com/archlinux/core/$arch
 Server = https://geo.mirror.pkgbuild.com/extra/$arch
 Server = https://mirror.rackspace.com/archlinux/extra/$arch
 
-[community]
-Server = https://geo.mirror.pkgbuild.com/community/$arch
-Server = https://mirror.rackspace.com/archlinux/community/$arch
-
 [multilib]
 Server = https://geo.mirror.pkgbuild.com/multilib/$arch
 Server = https://mirror.rackspace.com/archlinux/multilib/$arch
@@ -794,6 +790,14 @@ deploy_core_components() {
     else
         log_warn "  core/services/ not found, skipping"
     fi
+
+    # Single source of truth for subvolume names/label (consumed by
+    # immount-root.sh and any other deployed script).
+    mkdir -p "${AIROOTFS}/usr/lib/aion"
+    if [[ -f "${SCRIPT_DIR}/build/constants.sh" ]]; then
+        cp -a "${SCRIPT_DIR}/build/constants.sh" "${AIROOTFS}/usr/lib/aion/constants.sh"
+        log_success "  build/constants.sh → /usr/lib/aion/constants.sh"
+    fi
 }
 
 # Copy all Aion UI components into the ISO filesystem.
@@ -962,7 +966,7 @@ ConditionPathExists=!/var/lib/aion/.boot-configured
 
 [Service]
 Type=oneshot
-ExecStart=/usr/lib/aion/services/immount-root.sh
+ExecStart=/usr/lib/aion/services/immount-root.sh --setup
 RemainAfterExit=yes
 StandardOutput=journal
 StandardError=journal
@@ -982,7 +986,7 @@ Wants=pipewire.service wireplumber.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/aion-audio-routing.sh setup
+ExecStart=/usr/local/bin/aion-audio-routing.sh --setup
 RemainAfterExit=yes
 
 [Install]

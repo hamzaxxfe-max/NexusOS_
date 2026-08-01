@@ -3,6 +3,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Single source of truth for subvolume names + label.
+CONSTANTS="${SCRIPT_DIR}/../constants.sh"
+[[ -f "${CONSTANTS}" ]] && . "${CONSTANTS}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -14,6 +17,8 @@ warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
 err()  { echo -e "${RED}[ERROR]${NC} $*" >&2; exit 1; }
 
 [[ $EUID -ne 0 ]] && err "Must run as root"
+[[ -z "$ROOT_UUID" ]] && err "ROOT_UUID required (UUID of target Btrfs partition)"
+export ROOT_UUID SUBVOL_ROOT SUBVOL_ALT
 
 log "=== Aion Phase 2: Gaming Kernel ==="
 
@@ -24,22 +29,29 @@ arch-chroot /mnt /bin/bash <<'CHROOT'
         | pacman-key --add - 2>/dev/null
     pacman-key --lsign-key 5E1ABF44AC08BF54
 
+    # Dedicated mirrorlist for CachyOS only. Do NOT touch /etc/pacman.d/mirrorlist
+    # (Arch core/extra/multilib must keep their own mirrors).
+    cat > /etc/pacman.d/cachyos-mirrorlist <<'MIRROR'
+## Aion: CachyOS repos only (gaming kernel + pre-compiled NVIDIA).
+## Note: mirror.cachyos.org uses /repo/$arch/$repo, not /$repo/$arch.
+Server = https://mirror.cachyos.org/repo/$arch/$repo
+MIRROR
+
     cat >> /etc/pacman.conf <<'REPO'
 
 # CachyOS repos (gaming kernel + NVIDIA pre-compiled)
 [cachyos]
-Include = /etc/pacman.d/mirrorlist
+Include = /etc/pacman.d/cachyos-mirrorlist
+SigLevel = Required DatabaseOptional
 
 [cachyos-core]
-Include = /etc/pacman.d/mirrorlist
+Include = /etc/pacman.d/cachyos-mirrorlist
+SigLevel = Required DatabaseOptional
 
 [cachyos-extra]
-Include = /etc/pacman.d/mirrorlist
+Include = /etc/pacman.d/cachyos-mirrorlist
+SigLevel = Required DatabaseOptional
 REPO
-
-    cat > /etc/pacman.d/mirrorlist <<'MIRROR'
-Server = https://mirror.cachyos.org/$repo/$arch
-MIRROR
 
     pacman -Syu --noconfirm
 
@@ -110,12 +122,14 @@ NVIDIA_CONF
     fi
 
     # ── Gaming kernel parameters ─────────────────────────────────────
-    # Update boot entry for slot A
-    ROOT_UUID=$(blkid -s UUID -o value /dev/disk/by-label/aion)
-    for SLOT in a b; do
-        ENTRY="/boot/loader/entries/aion-${SLOT}.conf"
+    # Update boot entries for active + alternate slots ($ROOT_UUID is
+    # exported from the outer shell; subvols read from constants).
+    for ENTRY_SUBVOL in "${SUBVOL_ROOT}:aion-active" "${SUBVOL_ALT}:aion-alt"; do
+        SUBVOL="${ENTRY_SUBVOL%%:*}"
+        ENTRY_NAME="${ENTRY_SUBVOL##*:}"
+        ENTRY="/boot/loader/entries/${ENTRY_NAME}.conf"
         if [[ -f "$ENTRY" ]]; then
-            sed -i "s|options .*|options root=UUID=${ROOT_UUID} rootflags=subvol=@${SLOT^^} rw mitigations=off nowatchdog tsc=reliable clocksource=tsc tsc=unstable nvidia-drm.modeset=1 nvidia-drm.fbdev=1 rd.udev.log_priority=3 vt.global_cursor_default=0 loglevel=3 splash systemd.unified_cgroup_hierarchy=1|" "$ENTRY"
+            sed -i "s|options .*|options root=UUID=${ROOT_UUID} rootflags=subvol=${SUBVOL} rw mitigations=off nowatchdog tsc=reliable clocksource=tsc tsc=unstable nvidia-drm.modeset=1 nvidia-drm.fbdev=1 rd.udev.log_priority=3 vt.global_cursor_default=0 loglevel=3 splash systemd.unified_cgroup_hierarchy=1|" "$ENTRY"
         fi
     done
 

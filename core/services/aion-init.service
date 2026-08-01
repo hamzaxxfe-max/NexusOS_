@@ -10,10 +10,10 @@ Wants=systemd-udev-settle.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/lib/aion/immount-root.sh --setup
-ExecStart=/usr/lib/aion/immount-root.sh --mount-overlay
-ExecStop=/usr/lib/aion/immount-root.sh --unmount-overlay
-ExecReload=/usr/lib/aion/immount-root.sh --remount-overlay
+ExecStart=/usr/lib/aion/services/immount-root.sh --setup
+ExecStart=/usr/lib/aion/services/immount-root.sh --mount-overlay
+ExecStop=/usr/lib/aion/services/immount-root.sh --unmount-overlay
+ExecReload=/usr/lib/aion/services/immount-root.sh --remount-overlay
 ExecCondition=/bin/sh -c 'test ! -f /etc/aion/.maintenance-mode'
 
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin

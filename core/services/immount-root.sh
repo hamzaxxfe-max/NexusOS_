@@ -1,6 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
+# Single source of truth for subvolume names + label.
+CONSTANTS="/usr/lib/aion/constants.sh"
+[[ -f "${CONSTANTS}" ]] && . "${CONSTANTS}"
+
 AION_ROOT_MOUNT="/mnt/aion-root"
 OVERLAY_UPPER="/run/aion/overlay-upper"
 OVERLAY_WORK="/run/aion/overlay-work"
@@ -9,6 +13,11 @@ BTRFS_DEVID=""
 MAINTENANCE_FLAG="/etc/aion/.maintenance-mode"
 LOG_FILE="/var/log/aion/immutable-root.log"
 ROLLBACK_FLAG="/etc/aion/.rollback-requested"
+ROOT_SUBVOL="${SUBVOL_ROOT:-@}"
+HOME_SUBVOL="${SUBVOL_HOME:-@home}"
+VAR_SUBVOL="${SUBVOL_VAR:-@var}"
+TMP_SUBVOL="${SUBVOL_TMP:-@tmp}"
+ETC_SUBVOL="${SUBVOL_ETC:-@etc-aion}"
 
 log() {
     local level="$1"
@@ -98,14 +107,14 @@ create_subvolumes() {
     local existing_subs
     existing_subs=$(btrfs subvolume list "${root_dev}" 2>/dev/null || true)
 
-    if echo "${existing_subs}" | grep -q " @root"; then
-        log_info "Subvolume @root already exists"
+    if echo "${existing_subs}" | grep -q " ${ROOT_SUBVOL}"; then
+        log_info "Subvolume ${ROOT_SUBVOL} already exists"
     else
-        log_info "Creating subvolume @root"
-        btrfs subvolume create "${AION_ROOT_MOUNT}/@root"
+        log_info "Creating subvolume ${ROOT_SUBVOL}"
+        btrfs subvolume create "${AION_ROOT_MOUNT}/${ROOT_SUBVOL}"
     fi
 
-    local subvols=("@home" "@etc-aion" "@var-log" "@tmp" "@root")
+    local subvols=("${HOME_SUBVOL}" "${ETC_SUBVOL}" "${VAR_SUBVOL}" "${TMP_SUBVOL}" "${ROOT_SUBVOL}")
     for subvol in "${subvols[@]}"; do
         if echo "${existing_subs}" | grep -q " ${subvol}$"; then
             log_info "Subvolume ${subvol} already exists"
@@ -120,19 +129,19 @@ populate_root_subvolume() {
     local root_dev
     root_dev=$(findmnt -n -o SOURCE /)
 
-    log_info "Populating @root subvolume with current root contents"
-    btrfs subvolume set-default "$(btrfs subvolume show "${AION_ROOT_MOUNT}/@root" | grep 'Subvolume ID' | awk '{print $3}')" "${root_dev}" 2>/dev/null || true
+    log_info "Populating ${ROOT_SUBVOL} subvolume with current root contents"
+    btrfs subvolume set-default "$(btrfs subvolume show "${AION_ROOT_MOUNT}/${ROOT_SUBVOL}" | grep 'Subvolume ID' | awk '{print $3}')" "${root_dev}" 2>/dev/null || true
 
     local temp_mount="/tmp/aion-populate-$$"
     mkdir -p "${temp_mount}"
     mount -t btrfs -o rw,compress=zstd:3,noatime "${root_dev}" "${temp_mount}"
 
-    if [ ! -f "${temp_mount}/@root/.populated" ]; then
-        rsync -a --exclude='/@root/*' --exclude='/@home/*' --exclude='/@etc-aion/*' \
-            --exclude='/@var-log/*' --exclude='/@tmp/*' --exclude='/boot/*' \
-            "${temp_mount}/" "${temp_mount}/@root/" 2>/dev/null || \
-            cp -a "${temp_mount}/"[!.]* "${temp_mount}/@root/" 2>/dev/null || true
-        touch "${temp_mount}/@root/.populated"
+    if [ ! -f "${temp_mount}/${ROOT_SUBVOL}/.populated" ]; then
+        rsync -a --exclude="/${ROOT_SUBVOL}/*" --exclude="/${HOME_SUBVOL}/*" --exclude="/${ETC_SUBVOL}/*" \
+            --exclude="/${VAR_SUBVOL}/*" --exclude="/${TMP_SUBVOL}/*" --exclude='/boot/*' \
+            "${temp_mount}/" "${temp_mount}/${ROOT_SUBVOL}/" 2>/dev/null || \
+            cp -a "${temp_mount}/"[!.]* "${temp_mount}/${ROOT_SUBVOL}/" 2>/dev/null || true
+        touch "${temp_mount}/${ROOT_SUBVOL}/.populated"
         log_info "Root subvolume populated"
     fi
 
@@ -145,11 +154,11 @@ set_readonly_root() {
     root_dev=$(findmnt -n -o SOURCE /)
 
     local subvol_id
-    subvol_id=$(btrfs subvolume show "${AION_ROOT_MOUNT}/@root" | grep 'Subvolume ID' | awk '{print $3}')
+    subvol_id=$(btrfs subvolume show "${AION_ROOT_MOUNT}/${ROOT_SUBVOL}" | grep 'Subvolume ID' | awk '{print $3}')
 
-    log_info "Setting @root subvolume to read-only (id=${subvol_id})"
+    log_info "Setting ${ROOT_SUBVOL} subvolume to read-only (id=${subvol_id})"
     btrfs subvolume set-default "${subvol_id}" "${root_dev}"
-    chattr +i "${AION_ROOT_MOUNT}/@root" 2>/dev/null || true
+    chattr +i "${AION_ROOT_MOUNT}/${ROOT_SUBVOL}" 2>/dev/null || true
 }
 
 setup_overlay_dirs() {
@@ -241,9 +250,9 @@ mount_overlay() {
     root_dev=$(findmnt -n -o SOURCE /)
 
     local root_subvol_id
-    root_subvol_id=$(btrfs subvolume show "${AION_ROOT_MOUNT}/@root" | grep 'Subvolume ID' | awk '{print $3}')
+    root_subvol_id=$(btrfs subvolume show "${AION_ROOT_MOUNT}/${ROOT_SUBVOL}" | grep 'Subvolume ID' | awk '{print $3}')
 
-    local root_lower="${AION_ROOT_MOUNT}/@root"
+    local root_lower="${AION_ROOT_MOUNT}/${ROOT_SUBVOL}"
 
     setup_overlay_dirs
 
@@ -325,7 +334,7 @@ perform_rollback() {
     log_info "Resetting default subvolume to top-level"
     btrfs subvolume set-default 0 "${root_dev}"
 
-    chattr -i "${AION_ROOT_MOUNT}/@root" 2>/dev/null || true
+    chattr -i "${AION_ROOT_MOUNT}/${ROOT_SUBVOL}" 2>/dev/null || true
 
     log_info "Rollback complete. Root is now mutable."
     log_info "Reboot recommended to apply changes."
@@ -363,7 +372,7 @@ print_status() {
     fi
 
     local root_subvol
-    root_subvol=$(btrfs subvolume show "${AION_ROOT_MOUNT}/@root" 2>/dev/null | grep 'Name' | awk '{print $2}' || echo "unknown")
+    root_subvol=$(btrfs subvolume show "${AION_ROOT_MOUNT}/${ROOT_SUBVOL}" 2>/dev/null | grep 'Name' | awk '{print $2}' || echo "unknown")
     echo "Root subvolume: ${root_subvol}"
 
     local default_subvol

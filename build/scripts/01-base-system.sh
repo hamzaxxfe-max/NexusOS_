@@ -3,9 +3,15 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Single source of truth for subvolume names + label.
+CONSTANTS="${SCRIPT_DIR}/../constants.sh"
+[[ -f "${CONSTANTS}" ]] && . "${CONSTANTS}"
+
 WORK_DIR="${WORK_DIR:-/var/lib/aion-build}"
 ROOT_UUID="${ROOT_UUID:-}"
 HOSTNAME="${HOSTNAME:-aion}"
+# Raw root partition device, e.g. /dev/sda2 — passed by build.sh.
+ROOT_DEV="${1:-${ROOT_DEV:-}}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -18,34 +24,39 @@ err()  { echo -e "${RED}[ERROR]${NC} $*" >&2; exit 1; }
 
 [[ $EUID -ne 0 ]] && err "Must run as root"
 [[ -z "$ROOT_UUID" ]] && err "ROOT_UUID required (UUID of target Btrfs partition)"
+[[ -z "$ROOT_DEV" ]] && err "Root partition device required (pass as \$1, e.g. /dev/sda2)"
+[[ -b "$ROOT_DEV" ]] || err "Not a block device: ${ROOT_DEV}"
 
 log "=== Aion Phase 1: Base System ==="
 
-# ── Partitioning & Btrfs A/B ─────────────────────────────────────────
-log "Formatting Btrfs with A/B dual-root layout..."
-mkfs.btrfs -f -L aion -U "$ROOT_UUID" /dev/disk/by-label/aion
+# ── Partitioning & Btrfs dual-root layout ────────────────────────────
+# The partition is already formatted by build.sh (or the installer). We
+# target the RAW device, never /dev/disk/by-label (label does not exist
+# before the first mkfs and udev may not have settled).
+log "Formatting Btrfs with dual-root layout (label=${LABEL_AION})..."
+mkfs.btrfs -f -L "${LABEL_AION}" -U "$ROOT_UUID" "${ROOT_DEV}"
 
-mount /dev/disk/by-label/aion /mnt
+mount "${ROOT_DEV}" /mnt
 
 # Create Btrfs subvolumes — dual root slots for atomic updates
-btrfs subvolume create /mnt/@A
-btrfs subvolume create /mnt/@B
-btrfs subvolume create /mnt/@home
-btrfs subvolume create /mnt/@var
-btrfs subvolume create /mnt/@snapshots
-btrfs subvolume create /mnt/@swap
+btrfs subvolume create "/mnt/${SUBVOL_ROOT}"
+btrfs subvolume create "/mnt/${SUBVOL_ALT}"
+btrfs subvolume create "/mnt/${SUBVOL_HOME}"
+btrfs subvolume create "/mnt/${SUBVOL_VAR}"
+btrfs subvolume create "/mnt/${SUBVOL_SNAP}"
+btrfs subvolume create "/mnt/${SUBVOL_SWAP}"
 
 umount /mnt
 
-# Mount slot A as default
-mount -o compress=zstd,noatime,subvol=@A /dev/disk/by-label/aion /mnt
-mkdir -p /mnt/{home,var,.snapshots,swap,B}
+# Mount active slot as default
+mount -o compress=zstd,noatime,subvol="${SUBVOL_ROOT}" "${ROOT_DEV}" /mnt
+mkdir -p /mnt/home /mnt/var /mnt/.snapshots /mnt/swap /mnt/alt
 
-mount -o compress=zstd,noatime,subvol=@home /dev/disk/by-label/aion /mnt/home
-mount -o compress=zstd,noatime,subvol=@var /dev/disk/by-label/aion /mnt/var
-mount -o compress=zstd,noatime,subvol=@snapshots /dev/disk/by-label/aion /mnt/.snapshots
-mount -o compress=zstd,noatime,subvol=@swap /dev/disk/by-label/aion /mnt/swap
-mount -o compress=zstd,noatime,subvol=@B /dev/disk/by-label/aion /mnt/B
+mount -o compress=zstd,noatime,subvol="${SUBVOL_HOME}" "${ROOT_DEV}" /mnt/home
+mount -o compress=zstd,noatime,subvol="${SUBVOL_VAR}" "${ROOT_DEV}" /mnt/var
+mount -o compress=zstd,noatime,subvol="${SUBVOL_SNAP}" "${ROOT_DEV}" /mnt/.snapshots
+mount -o compress=zstd,noatime,subvol="${SUBVOL_SWAP}" "${ROOT_DEV}" /mnt/swap
+mount -o compress=zstd,noatime,subvol="${SUBVOL_ALT}" "${ROOT_DEV}" /mnt/alt
 
 # ── Pacstrap ─────────────────────────────────────────────────────────
 log "Installing base system..."
@@ -62,8 +73,8 @@ pacstrap /mnt \
 log "Generating fstab..."
 genfstab -U /mnt >> /mnt/etc/fstab
 
-# ── BLS + A/B + Auto Rollback setup ──────────────────────────────────
-log "Configuring BLS A/B boot with auto rollback..."
+# ── BLS + dual-root + Auto Rollback setup ────────────────────────────
+log "Configuring BLS dual-root boot with auto rollback..."
 arch-chroot /mnt /bin/bash <<'CHROOT'
     # Hostname
     echo "aion" > /etc/hostname
@@ -104,31 +115,11 @@ UNIT
     mkdir -p /boot/loader/entries
 
     cat > /boot/loader/loader.conf <<'LOADER'
-default aion-a.conf
+default aion-active.conf
 timeout 3
 console-mode auto
 editor no
 LOADER
-
-    ROOT_UUID=$(blkid -s UUID -o value /dev/disk/by-label/aion)
-
-    # Slot A boot entry (BLS format)
-    cat > /boot/loader/entries/aion-a.conf <<ENTRY
-title   Aion (Slot A)
-version aion-a
-linux   /vmlinuz-linux
-initrd  /initramfs-linux.img
-options root=UUID=${ROOT_UUID} rootflags=subvol=@A rw mitigations=off
-ENTRY
-
-    # Slot B boot entry (BLS format)
-    cat > /boot/loader/entries/aion-b.conf <<ENTRY
-title   Aion (Slot B)
-version aion-b
-linux   /vmlinuz-linux
-initrd  /initramfs-linux.img
-options root=UUID=${ROOT_UUID} rootflags=subvol=@B rw mitigations=off
-ENTRY
 
     # ── systemd-bless-boot for auto rollback ────────────────────────
     # After 3 consecutive failed boots, systemd-boot auto-reverts
@@ -151,46 +142,48 @@ AB_SERVICE
     # A/B manager script
     cat > /usr/bin/aion-ab-manager <<'AB_MANAGER'
 #!/usr/bin/env bash
-# Aion A/B Slot Manager
-# Manages boot slot selection and auto-rollback
+# Aion dual-root Slot Manager
+# Manages boot slot selection and auto-rollback between @ and @alt
 set -euo pipefail
 
 AB_STATE="/etc/aion-ab-state"
 BOOT_ENTRIES="/boot/loader/entries"
 LOADER_CONF="/boot/loader/loader.conf"
+ACTIVE_CONF="aion-active.conf"
+ALT_CONF="aion-alt.conf"
 
 get_active_slot() {
     local title
     title=$(grep "^title" "${BOOT_ENTRIES}/"*.conf 2>/dev/null | grep "active" | head -1)
-    if [[ "$title" == *"Slot A"* ]]; then
-        echo "A"
+    if [[ "$title" == *"Active Slot"* ]]; then
+        echo "active"
     else
-        echo "B"
+        echo "alt"
     fi
 }
 
 get_inactive_slot() {
     local active
     active=$(get_active_slot)
-    if [[ "$active" == "A" ]]; then
-        echo "B"
+    if [[ "$active" == "active" ]]; then
+        echo "alt"
     else
-        echo "A"
+        echo "active"
     fi
 }
 
 set_active_slot() {
     local slot="$1"
     local other
-    other=$(if [[ "$slot" == "A" ]]; then echo "B"; else echo "A"; fi)
+    other=$(if [[ "$slot" == "active" ]]; then echo "alt"; else echo "active"; fi)
 
     # Mark active slot
-    sed -i "s/Slot .*/Slot ${slot} (active)/" "${BOOT_ENTRIES}/aion-${slot,,}.conf"
+    sed -i "s/Slot .*/Slot ${slot} (active)/" "${BOOT_ENTRIES}/aion-${slot}.conf"
     # Mark other as inactive
-    sed -i "s/Slot .* (active)/Slot ${other}/" "${BOOT_ENTRIES}/aion-${other,,}.conf"
+    sed -i "s/Slot .* (active)/Slot ${other}/" "${BOOT_ENTRIES}/aion-${other}.conf"
 
     # Set default boot
-    sed -i "s/^default .*/default aion-${slot,,}.conf/" "$LOADER_CONF"
+    sed -i "s/^default .*/default aion-${slot}.conf/" "$LOADER_CONF"
 
     # Record state
     echo "active_slot=${slot}" > "$AB_STATE"
@@ -230,7 +223,7 @@ mark_good() {
 rollback() {
     local other
     other=$(get_inactive_slot)
-    echo "Rolling back to Slot ${other}..."
+    echo "Rolling back to ${other} slot..."
     set_active_slot "$other"
     echo "Rollback complete. Rebooting..."
     systemctl reboot
@@ -248,7 +241,7 @@ case "${1:-}" in
     switch)
         # Manual slot switch
         set_active_slot "$(get_inactive_slot)"
-        echo "Switched to Slot $(get_inactive_slot). Reboot to apply."
+        echo "Switched to $(get_inactive_slot) slot. Reboot to apply."
         ;;
     rollback)
         rollback
@@ -298,12 +291,35 @@ MARK_GOOD
 
 CHROOT
 
-# ── Initialize A/B state ─────────────────────────────────────────────
+# ── Boot entries (written here so ${ROOT_UUID} + subvols expand) ─────
+# Re-mount the active root subvolume so we can write to /boot inside it.
+mount -o compress=zstd,noatime,subvol="${SUBVOL_ROOT}" "${ROOT_DEV}" /mnt 2>/dev/null || true
+arch-chroot /mnt /bin/bash <<ENTRIES
+mkdir -p /boot/loader/entries
+
+cat > /boot/loader/entries/aion-active.conf <<'ENTRY'
+title   Aion (Active Slot)
+version aion-active
+linux   /vmlinuz-linux
+initrd  /initramfs-linux.img
+options root=UUID=${ROOT_UUID} rootflags=subvol=${SUBVOL_ROOT} rw mitigations=off
+ENTRY
+
+cat > /boot/loader/entries/aion-alt.conf <<'ENTRY2'
+title   Aion (Alternate Slot)
+version aion-alt
+linux   /vmlinuz-linux
+initrd  /initramfs-linux.img
+options root=UUID=${ROOT_UUID} rootflags=subvol=${SUBVOL_ALT} rw mitigations=off
+ENTRY2
+ENTRIES
+
+# ── Initialize dual-root state ───────────────────────────────────────
 mkdir -p /mnt/etc
 cat > /mnt/etc/aion-ab-state <<'STATE'
-active_slot=A
+active_slot=active
 boot_count=0
 last_good=initial
 STATE
 
-log "=== Phase 1 Complete: A/B system with auto rollback ==="
+log "=== Phase 1 Complete: dual-root system with auto rollback ==="

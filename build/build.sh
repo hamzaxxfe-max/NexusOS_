@@ -185,7 +185,7 @@ mount "${TARGET_DEVICE}p1" /mnt/boot
 
 # Step 2: Base system
 log "Step 2/6: Installing base system..."
-bash "$SCRIPT_DIR/scripts/01-base-system.sh"
+bash "$SCRIPT_DIR/scripts/01-base-system.sh" "${TARGET_DEVICE}p2"
 
 # Step 3: Gaming kernel
 log "Step 3/6: Installing gaming kernel..."
