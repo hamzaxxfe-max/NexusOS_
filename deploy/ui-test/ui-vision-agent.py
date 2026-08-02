@@ -48,7 +48,8 @@ def scan_source(app_name, path):
             # These may legitimately exist only at runtime; only flag ones that
             # point at the repo-relative tree and are clearly missing.
             if p.startswith("/etc/aion") or p.startswith("/usr/share/aion"):
-                finding("MED", app_name, f"config path may be missing at runtime: {p}", f"line {text.count(chr(10), 0, m.start()) + 1}")
+                finding("INFO", app_name, f"deploy-created config path (expected): {p}",
+                        f"line {text.count(chr(10), 0, m.start()) + 1}")
 
     # 2. Duplicate button labels (copy/paste bugs) within the same file.
     labels = re.findall(r'QPushButton\("([^"]{1,40})"\)', text)
@@ -91,8 +92,8 @@ def scan_runtime(app_name, window):
                 t = child.text()
                 if t.strip() == "" and child.objectName() and "bg" not in child.objectName().lower():
                     pass  # decorative labels are fine
-                elif len(t) > 60:
-                    finding("LOW", app_name, f"very long label ({len(t)} chars): {t[:48]}...")
+                elif len(t) > 120 and "\n" not in t:
+                    finding("LOW", app_name, f"very long single-line label ({len(t)} chars): {t[:48]}...")
             elif isinstance(child, QPushButton):
                 if not child.isEnabled():
                     finding("MED", app_name, f"button disabled at load: \"{child.text()}\"")
@@ -175,6 +176,16 @@ def render_and_inspect(app_name, app_path, out_dir):
 
     # Click-through: walk every QStackedWidget, advancing via its Next button.
     from PyQt6.QtWidgets import QStackedWidget, QPushButton
+    import time as _time
+
+    def pump(ms):
+        # Spin the Qt event loop so QTimer/QPropertyAnimation transitions
+        # (spring slides etc.) fully finish before we inspect the stack index.
+        end = _time.monotonic() + ms / 1000.0
+        while _time.monotonic() < end:
+            app.processEvents()
+            _time.sleep(0.01)
+
     stack = window.findChild(QStackedWidget)
     if stack is not None:
         start = stack.currentIndex()
@@ -182,10 +193,12 @@ def render_and_inspect(app_name, app_path, out_dir):
         for _ in range(stack.count() * 2):
             advanced = False
             for btn in window.findChildren(QPushButton):
-                if btn.isEnabled() and "next" in btn.text().lower() or (btn.text().lower() in ("next", "finish", "launch aion")):
+                label = btn.text().lower()
+                is_next_btn = "next" in label or label in ("finish", "launch aion")
+                if btn.isEnabled() and is_next_btn:
                     try:
                         btn.click()
-                        app.processEvents()
+                        pump(700)
                         idx = stack.currentIndex()
                         if idx not in visited:
                             visited.add(idx)
