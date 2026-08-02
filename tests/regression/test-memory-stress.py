@@ -34,6 +34,14 @@ def _is_linux():
     return os.path.exists("/proc")
 
 
+def _is_aion_os():
+    """True only when running on the deployed Aion OS (not a generic CI host)."""
+    return any(
+        os.path.exists(marker)
+        for marker in ("/etc/aion", "/usr/lib/aion", "/usr/share/aion")
+    )
+
+
 def _read_meminfo():
     if not PROC_MEMINFO.exists():
         return {}
@@ -125,7 +133,7 @@ def _is_mounted_readonly(mount_point="/"):
 
 class TestMemoryStress(unittest.TestCase):
 
-    @unittest.skipUnless(_is_linux(), "Requires /proc (Linux only)")
+    @unittest.skipUnless(_is_aion_os(), "Idle RAM budget only applies on the deployed Aion OS")
     def test_idle_ram_below_400mb(self):
         used_mb = _get_used_mem_mb()
         self.assertIsNotNone(used_mb, "Could not read /proc/meminfo")
@@ -134,7 +142,7 @@ class TestMemoryStress(unittest.TestCase):
             f"Idle RAM usage {used_mb:.1f}MB exceeds limit of {IDLE_RAM_LIMIT_MB}MB"
         )
 
-    @unittest.skipUnless(_is_linux(), "Requires Linux sysfs")
+    @unittest.skipUnless(_is_aion_os(), "zram is provisioned by the Aion OS (not a generic CI host)")
     def test_zram_configured(self):
         self.assertTrue(
             _path_exists(ZRAM_BASE),
@@ -152,7 +160,7 @@ class TestMemoryStress(unittest.TestCase):
             f"Unexpected zram compressor: {compressor_name}"
         )
 
-    @unittest.skipUnless(_is_linux(), "Requires Linux sysfs")
+    @unittest.skipUnless(_is_aion_os(), "zram is provisioned by the Aion OS (not a generic CI host)")
     def test_zram_size_matches_config(self):
         disksize_str = _read_sys_file(ZRAM_BASE / "disksize")
         self.assertIsNotNone(disksize_str, "Cannot read zram0 disksize")
@@ -163,7 +171,7 @@ class TestMemoryStress(unittest.TestCase):
             f"({ZRAM_DISKSIZE / (1024*1024*1024):.1f}GB)"
         )
 
-    @unittest.skipUnless(_is_linux(), "Requires Linux cgroups")
+    @unittest.skipUnless(_is_aion_os(), "gaming cgroup slice is provisioned by the Aion OS")
     def test_throttler_cgroups_exist(self):
         self.assertTrue(
             _path_exists(CGROUP_BASE),
@@ -181,7 +189,7 @@ class TestMemoryStress(unittest.TestCase):
             f"cpu.max has unexpected format: {cpu_max}"
         )
 
-    @unittest.skipUnless(_is_linux(), "Requires Linux cgroups")
+    @unittest.skipUnless(_is_aion_os(), "gaming cgroup slice is provisioned by the Aion OS")
     def test_throttler_cpu_weight_range(self):
         weight_str = _read_sys_file(CGROUP_BASE / "cpu.weight")
         if weight_str is None:
@@ -354,7 +362,7 @@ class TestMemoryStress(unittest.TestCase):
                     f"zram0/stat/{stat_file} is not numeric: {value}"
                 )
 
-    @unittest.skipUnless(_is_linux(), "Requires Linux cgroups")
+    @unittest.skipUnless(_is_aion_os(), "gaming cgroup slice is provisioned by the Aion OS")
     def test_cgroup_memory_limit_set(self):
         mem_max = _read_sys_file(CGROUP_BASE / "memory.max")
         mem_limit = _read_sys_file(CGROUP_BASE / "memory.limit_in_bytes")

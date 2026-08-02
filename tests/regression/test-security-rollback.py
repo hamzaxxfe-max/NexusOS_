@@ -60,6 +60,14 @@ def _is_linux():
     return os.path.exists("/proc")
 
 
+def _is_aion_os():
+    """True only when running on the deployed Aion OS (not a generic CI host)."""
+    return any(
+        os.path.exists(marker)
+        for marker in ("/etc/aion", "/usr/lib/aion", "/usr/share/aion")
+    )
+
+
 def _get_mount_options(mount_point):
     try:
         with open("/proc/mounts") as f:
@@ -120,7 +128,7 @@ class TestSecurityRollback(unittest.TestCase):
                 f"SELinux type '{selinux_type}' not defined in policy files",
             )
 
-    @unittest.skipUnless(_is_linux(), "Requires Linux mount info")
+    @unittest.skipUnless(_is_aion_os(), "Immutable root is a property of the deployed Aion OS")
     def test_immutable_root_is_readonly(self):
         opts = _get_mount_options("/")
         if opts is None:
@@ -307,6 +315,7 @@ class TestSecurityRollback(unittest.TestCase):
                         bad.append(f"{sf}: {lp}")
         self.assertEqual(len(bad), 0, f"Bad log paths: {bad}")
 
+    @unittest.skipUnless(_is_aion_os(), "Only checks Aion's own systemd units on the deployed OS")
     def test_service_files_no_root_shell(self):
         services = _find_service_files()
         violations = []

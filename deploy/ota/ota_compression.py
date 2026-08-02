@@ -134,14 +134,13 @@ def decompress(src: Path, dest: Path) -> bool:
 
 def _run(cmd: list[str], out: Path | None = None) -> bool:
     try:
-        kw = {}
         if out is not None:
-            kw["stdout"] = open(out, "wb")
-        result = subprocess.run(cmd, capture_output=True, timeout=900, **kw)
-        if out is not None:
-            kw["stdout"].close()
+            with open(out, "wb") as fout:
+                result = subprocess.run(cmd, stdout=fout, stderr=subprocess.PIPE, timeout=900)
+        else:
+            result = subprocess.run(cmd, capture_output=True, timeout=900)
         if result.returncode != 0:
-            logger.error("command failed %s: %s", cmd, result.stderr[:300])
+            logger.error("command failed %s: %s", cmd, (result.stderr or b"")[:300])
             if out is not None and out.exists():
                 out.unlink(missing_ok=True)
             return False
