@@ -221,6 +221,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Refresh pacman databases
+        run: |
+          pacman -Syy --noconfirm archlinux-keyring
+          pacman -S --noconfirm --needed git
+          pacman -Syy --noconfirm
+
       - name: Generate version
         id: version
         run: |
@@ -240,11 +246,6 @@ jobs:
           echo "\`\`\`" >> "$GITHUB_STEP_SUMMARY"
           echo "Aion $VERSION" >> "$GITHUB_STEP_SUMMARY"
           echo "\`\`\`" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Refresh pacman databases
-        run: |
-          pacman -Syy --noconfirm archlinux-keyring
-          pacman -Syy --noconfirm
 
       - name: Build ISO
         id: build
