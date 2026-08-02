@@ -601,8 +601,11 @@ class TestAndroid(unittest.TestCase):
 class TestDeployment(unittest.TestCase):
     def test_release_pipeline_has_build_job(self):
         src = _read("deploy/github/release-pipeline.yml")
+        builder = _read("Aion-Builder.sh")
         self.assertIn("build-iso", src)
-        self.assertIn("archiso", src, "Build should use archiso")
+        self.assertIn("container: archlinux", src)
+        self.assertIn("Aion-Builder.sh", src)
+        self.assertIn("mkarchiso", builder, "Build should use archiso (mkarchiso)")
 
     def test_release_pipeline_has_manifest_job(self):
         src = _read("deploy/github/release-pipeline.yml")

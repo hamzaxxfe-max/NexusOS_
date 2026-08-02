@@ -89,13 +89,23 @@ class TestCICDValidation(unittest.TestCase):
             )
 
     def test_release_pipeline_uses_archiso(self):
-        content = _read_file(PIPELINE_FILE)
-        self.assertIsNotNone(content, "Cannot read release-pipeline.yml")
+        pipeline = _read_file(PIPELINE_FILE)
+        self.assertIsNotNone(pipeline, "Cannot read release-pipeline.yml")
+        builder = _read_file(BUILDER_SCRIPT)
+        self.assertIsNotNone(builder, "Cannot read Aion-Builder.sh")
+        self.assertIn(
+            "container: archlinux", pipeline,
+            "Release pipeline build job must run in an archlinux container"
+        )
+        self.assertIn(
+            "Aion-Builder.sh", pipeline,
+            "Release pipeline build job must invoke Aion-Builder.sh"
+        )
         archiso_indicators = ["archiso", "mkarchiso", "arch-iso"]
-        found = any(ind in content.lower() for ind in archiso_indicators)
+        found = any(ind in builder.lower() for ind in archiso_indicators)
         self.assertTrue(
             found,
-            "Release pipeline build step does not reference archiso or mkarchiso"
+            "Aion-Builder.sh does not reference archiso or mkarchiso"
         )
 
     def test_release_pipeline_generates_checksums(self):
