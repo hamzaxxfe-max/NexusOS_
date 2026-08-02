@@ -1,21 +1,24 @@
 {
-    "latest_version": "1.0.0",
-    "download_url": "https://github.com/username/aion/releases/download/v1.0.0/aion-1.0.0.iso",
-    "sha256": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2",
-    "release_date": "2026-07-27T00:00:00Z",
-    "release_notes": "Aion 1.0.0 — First stable release. Immutable root filesystem, Btrfs snapshot-based atomic updates, OTA incremental patching, and desktop environment.",
-    "manifest_signature_url": "https://raw.githubusercontent.com/username/aion/main/deploy/ota/manifest.json.sig",
-    "signature_url": "https://github.com/username/aion/releases/download/v1.0.0/aion-1.0.0.iso.sig",
-    "full_release_notes": "Aion 1.0.0 Stable Release\n\nFeatures:\n- Immutable root filesystem with dm-verity\n- Btrfs snapshot-based atomic updates\n- OTA incremental patching (xdelta3 diffs)\n- Automatic rollback on boot failure\n- GRUB bootloader with snapshot selection\n- systemd-based service management\n- Desktop environment (Hyprland + Waybar)\n- Package management via pacman\n- Secure boot support\n\nBug Fixes:\n- Fixed snapshot cleanup not running on timer\n- Fixed network manager restart after rollback\n- Fixed bootloader entry ordering\n\nKnown Issues:\n- First boot may take longer while generating initramfs\n- Secure boot requires manual key enrollment on first install",
-    "min_required_version": "0.9.0",
-    "size": 2400,
-    "incremental_patches": [
-        {
-            "from_version": "0.9.0",
-            "to_version": "1.0.0",
-            "patch_url": "https://github.com/username/aion/releases/download/v1.0.0/patch-0.9.0-to-1.0.0.xdelta",
-            "sha256": "f7e8d9c0b1a2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8",
-            "size": 340
-        }
-    ]
+  "latest_version": "0.0.0-dev.202608021022.gb86b4e9",
+  "download_url": "https://github.com/hamzaxxfe-max/NexusOS_/releases/download/v0.0.0-dev.202608021022.gb86b4e9/aion-0.0.0-dev.202608021022.gb86b4e9.iso",
+  "sha256": "1edd3b8c8dfe07dbe7d0d41abd09379a7eba623409d5e3375c571aff2cf287ba",
+  "release_date": "2026-08-02T11:02:52Z",
+  "release_notes": "Aion 1.0.0 \u2014 First stable release. Immutable root filesystem, Btrfs snapshot-based atomic updates, OTA incremental patching, and desktop environment.",
+  "manifest_signature_url": "https://raw.githubusercontent.com/username/aion/main/deploy/ota/manifest.json.sig",
+  "signature_url": "https://github.com/hamzaxxfe-max/NexusOS_/releases/download/v0.0.0-dev.202608021022.gb86b4e9/aion-0.0.0-dev.202608021022.gb86b4e9.iso.sig",
+  "full_release_notes": "Aion 1.0.0 Stable Release\n\nFeatures:\n- Immutable root filesystem with dm-verity\n- Btrfs snapshot-based atomic updates\n- OTA incremental patching (xdelta3 diffs)\n- Automatic rollback on boot failure\n- GRUB bootloader with snapshot selection\n- systemd-based service management\n- Desktop environment (Hyprland + Waybar)\n- Package management via pacman\n- Secure boot support\n\nBug Fixes:\n- Fixed snapshot cleanup not running on timer\n- Fixed network manager restart after rollback\n- Fixed bootloader entry ordering\n\nKnown Issues:\n- First boot may take longer while generating initramfs\n- Secure boot requires manual key enrollment on first install",
+  "min_required_version": "0.9.0",
+  "size": 3370457088,
+  "incremental_patches": [
+    {
+      "from_version": "0.9.0",
+      "to_version": "1.0.0",
+      "patch_url": "https://github.com/username/aion/releases/download/v1.0.0/patch-0.9.0-to-1.0.0.xdelta",
+      "sha256": "f7e8d9c0b1a2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8",
+      "size": 340
+    }
+  ],
+  "zst_url": "https://github.com/hamzaxxfe-max/NexusOS_/releases/download/v0.0.0-dev.202608021022.gb86b4e9/aion-0.0.0-dev.202608021022.gb86b4e9.iso.zst",
+  "zst_sha256": "a6dc07f1a382f08f69e4fabddd9698d1d013cd75fa7c34a6a5bb21a7c7890a99",
+  "zst_size": 3341054704
 }
