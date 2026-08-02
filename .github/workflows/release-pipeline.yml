@@ -367,6 +367,33 @@ jobs:
           path: build/SHA256SUMS
           retention-days: 30
 
+      - name: Split large assets into release chunks
+        id: split
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          ISO_PATH="${{ steps.build.outputs.iso_path }}"
+          ZST_PATH="${{ steps.compress.outputs.zst_path }}"
+          CHUNK_DIR="build/chunks"
+          mkdir -p "$CHUNK_DIR"
+
+          for SRC in "$ISO_PATH" "$ZST_PATH"; do
+            BASE="$(basename "$SRC")"
+            SIZE=$(stat -c%s "$SRC")
+            if [ "$SIZE" -gt 1990000000 ]; then
+              echo "Splitting $BASE ($((SIZE/1024/1024))MB) into 1.9GB chunks"
+              split -b 1900M -d -a 2 "$SRC" "$CHUNK_DIR/${BASE}.part-"
+            else
+              echo "Keeping $BASE under 2GB limit"
+              cp "$SRC" "$CHUNK_DIR/${BASE}"
+            fi
+          done
+
+          # Generate checksums for every release asset chunk
+          (cd "$CHUNK_DIR" && sha256sum * > "$CHUNK_DIR/SHA256SUMS.parts")
+          echo "chunk_dir=$CHUNK_DIR" >> "$GITHUB_OUTPUT"
+          echo "### Release Chunks" >> "$GITHUB_STEP_SUMMARY"
+          ls -lh "$CHUNK_DIR" | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
@@ -380,18 +407,20 @@ jobs:
             ## Aion ${{ steps.version.outputs.version }}
 
             ### Downloads
-            - **ISO**: \`aion-${{ steps.version.outputs.version }}.iso\`
-            - **ISO (ZSTD)**: \`aion-${{ steps.version.outputs.version }}.iso.zst\` — smaller OTA payload
-            - **SHA256**: \`SHA256SUMS\`
+            - **ISO chunks**: \`aion-${{ steps.version.outputs.version }}.iso.*\` — split at 1.9GB to fit GitHub's 2GB asset limit
+            - **ZSTD chunks**: \`aion-${{ steps.version.outputs.version }}.iso.zst.*\` — smaller OTA payload
+            - **SHA256**: \`SHA256SUMS\`, \`SHA256SUMS.parts\` (per-chunk)
             - **GPG signatures**: \`*.iso.sig\`, \`*.iso.zst.sig\` (verify with \`gpg --verify\`)
 
-            ### Installation
+            ### Recombine ISO
             ```bash
-            # Write ISO to USB
-            sudo dd if=aion-${{ steps.version.outputs.version }}.iso of=/dev/sdX bs=4M status=progress
+            cat aion-${{ steps.version.outputs.version }}.iso.00 aion-${{ steps.version.outputs.version }}.iso.01 > aion-${{ steps.version.outputs.version }}.iso
+            sha256sum -c SHA256SUMS.parts
+            ```
 
-            # Boot from USB and run installer
-            sudo aion-install
+            ### Write ISO to USB
+            ```bash
+            sudo dd if=aion-${{ steps.version.outputs.version }}.iso of=/dev/sdX bs=4M status=progress
             ```
 
             ### Verification
@@ -400,9 +429,10 @@ jobs:
             gpg --verify aion-${{ steps.version.outputs.version }}.iso.sig aion-${{ steps.version.outputs.version }}.iso
             ```
           files: |
-            ${{ steps.build.outputs.iso_path }}
-            ${{ steps.compress.outputs.zst_path }}
+            ${{ steps.split.outputs.chunk_dir }}/aion-${{ steps.version.outputs.version }}.iso.part-*
+            ${{ steps.split.outputs.chunk_dir }}/aion-${{ steps.version.outputs.version }}.iso.zst.part-*
             build/SHA256SUMS
+            ${{ steps.split.outputs.chunk_dir }}/SHA256SUMS.parts
             ${{ steps.build.outputs.iso_path }}.sig
             ${{ steps.compress.outputs.zst_path }}.sig
 
