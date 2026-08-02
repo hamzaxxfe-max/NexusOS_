@@ -496,9 +496,17 @@ jobs:
           git config user.name "Aion CI"
           git config user.email "ci@aion.dev"
           # Sign the updated manifest with the release key, then commit sig alongside.
-          gpg --batch --yes --armor --detach-sign \
-            -o deploy/ota/manifest.json.sig deploy/ota/manifest.json 2>/dev/null || true
-          git add deploy/ota/manifest.json deploy/ota/manifest.json.sig deploy/ota/aion-release.asc
+          if [ -f deploy/ota/manifest.json ]; then
+            if gpg --batch --yes --armor --detach-sign \
+              -o deploy/ota/manifest.json.sig deploy/ota/manifest.json 2>/dev/null; then
+              echo "Manifest signed"
+            else
+              echo "::warning::Manifest signing failed (no key) — continuing unsigned"
+            fi
+          fi
+          git add deploy/ota/manifest.json
+          [ -f deploy/ota/manifest.json.sig ] && git add deploy/ota/manifest.json.sig
+          [ -f deploy/ota/aion-release.asc ] && git add deploy/ota/aion-release.asc
           if git diff --cached --quiet; then
             echo "No manifest changes"
           else
