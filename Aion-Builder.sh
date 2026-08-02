@@ -1906,9 +1906,7 @@ preflight_checks() {
     fi
     log_success "Aion project root verified"
 
-    # Verify required tools (skip mkarchiso on non-Arch — installed via distro deps)
-    local distro
-    distro="$(detect_distro)"
+    # Verify required tools (skip mkarchiso — installed by install_dependencies below)
     local required_tools=("xz" "openssl")
     for tool in "${required_tools[@]}"; do
         if ! command -v "${tool}" &>/dev/null; then
@@ -1916,13 +1914,6 @@ preflight_checks() {
             exit 1
         fi
     done
-    # On Arch, also verify mkarchiso now; on other distros, verify AFTER install_dependencies
-    if [[ "${distro}" == "arch" ]]; then
-        if ! command -v mkarchiso &>/dev/null; then
-            log_error "Missing required tool: mkarchiso (install archiso)"
-            exit 1
-        fi
-    fi
     log_success "All required tools available"
 
     # Check disk space (need ~10GB)
