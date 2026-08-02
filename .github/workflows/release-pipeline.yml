@@ -389,7 +389,7 @@ jobs:
           done
 
           # Generate checksums for every release asset chunk
-          (cd "$CHUNK_DIR" && sha256sum * > "$CHUNK_DIR/SHA256SUMS.parts")
+          (cd "$CHUNK_DIR" && sha256sum * > SHA256SUMS.parts)
           echo "chunk_dir=$CHUNK_DIR" >> "$GITHUB_OUTPUT"
           echo "### Release Chunks" >> "$GITHUB_STEP_SUMMARY"
           ls -lh "$CHUNK_DIR" | tee -a "$GITHUB_STEP_SUMMARY"
