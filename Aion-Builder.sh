@@ -378,16 +378,16 @@ ParallelDownloads = 5
 Color
 
 [core]
-Server = https://geo.mirror.pkgbuild.com/core/$arch
-Server = https://mirror.rackspace.com/archlinux/core/$arch
+Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch
+Server = https://mirror.rackspace.com/archlinux/$repo/os/$arch
 
 [extra]
-Server = https://geo.mirror.pkgbuild.com/extra/$arch
-Server = https://mirror.rackspace.com/archlinux/extra/$arch
+Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch
+Server = https://mirror.rackspace.com/archlinux/$repo/os/$arch
 
 [multilib]
-Server = https://geo.mirror.pkgbuild.com/multilib/$arch
-Server = https://mirror.rackspace.com/archlinux/multilib/$arch
+Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch
+Server = https://mirror.rackspace.com/archlinux/$repo/os/$arch
 PACMANEOF
 
     log_success "pacman.conf generated"
