@@ -347,7 +347,7 @@ iso_application="Aion ${VERSION}"
 iso_version="${VERSION}"
 install_dir="aion"
 buildmodes=('iso')
-bootmodes=('uefi-x64.grub.esp' 'uefi-x64.grub.eltorito')
+bootmodes=('uefi.grub')
 arch='x86_64'
 pacman_conf='pacman.conf'
 airootfs_image_type='squashfs'
@@ -1590,6 +1590,70 @@ GRUBCFG
     log_success "GRUB configured"
 }
 
+# Write the grub.cfg used by mkarchiso's 'uefi.grub' boot mode (lives in the profile dir,
+# placeholders %INSTALL_DIR%/%ARCH%/%ARCHISO_UUID% are substituted by mkarchiso).
+generate_profile_grub() {
+    log_info "Generating profile GRUB config..."
+
+    mkdir -p "${PROFILE_DIR}/grub"
+
+    cat > "${PROFILE_DIR}/grub/grub.cfg" << 'PROGRUBCFG'
+# Aion archiso GRUB config (uefi.grub boot mode)
+if loadfont "${prefix}/fonts/unicode.pf2" ; then
+    insmod all_video
+    set gfxmode="auto"
+    terminal_input console
+    terminal_output console
+fi
+
+insmod serial
+if serial --unit=0 --speed=115200; then
+    terminal_input --append serial
+    terminal_output --append serial
+fi
+
+if [ "${grub_platform}" == 'efi' ]; then
+    archiso_platform='UEFI'
+elif [ "${grub_platform}" == 'pc' ]; then
+    archiso_platform='BIOS'
+else
+    archiso_platform="${grub_cpu}-${grub_platform}"
+fi
+
+set default="aion"
+set timeout=3
+set timeout_style=menu
+
+menuentry "Aion (%ARCH%, ${archiso_platform})" --class aion --class gnu-linux --class gnu --class os --id 'aion' {
+    set gfxpayload=keep
+    linux /%INSTALL_DIR%/boot/%ARCH%/vmlinuz-linux-zen archisobasedir=%INSTALL_DIR% archisosearchuuid=%ARCHISO_UUID%
+    initrd /%INSTALL_DIR%/boot/%ARCH%/initramfs-linux-zen.img
+}
+
+menuentry "Aion fallback (%ARCH%, ${archiso_platform})" --class aion --class gnu-linux --class gnu --class os --id 'aion-fallback' {
+    set gfxpayload=keep
+    linux /%INSTALL_DIR%/boot/%ARCH%/vmlinuz-linux-zen archisobasedir=%INSTALL_DIR% archisosearchuuid=%ARCHISO_UUID%
+    initrd /%INSTALL_DIR%/boot/%ARCH%/initramfs-linux-zen-fallback.img
+}
+
+if [ "${grub_platform}" == 'efi' ]; then
+    menuentry 'UEFI Firmware Settings' --class firmware {
+        fwsetup
+    }
+fi
+
+menuentry 'System shutdown' --class shutdown --class poweroff {
+    halt
+}
+
+menuentry 'System restart' --class reboot --class restart {
+    reboot
+}
+PROGRUBCFG
+
+    log_success "Profile GRUB config generated"
+}
+
 # =============================================================================
 # airootfs: Syslinux/Isolinux Configuration (BIOS Boot)
 # =============================================================================
@@ -1945,6 +2009,7 @@ main() {
     write_system_config
     configure_mkinitcpio
     configure_grub
+    generate_profile_grub
     configure_syslinux
     patch_boot_timeout
     setup_user_environment
