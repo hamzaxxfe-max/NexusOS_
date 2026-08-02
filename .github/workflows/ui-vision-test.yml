@@ -1,6 +1,12 @@
 name: UI Vision Test
 
 on:
+  push:
+    branches: [master]
+    paths:
+      - 'ui/**'
+      - 'deploy/ui-test/**'
+      - 'config/**'
   workflow_dispatch:
     inputs:
       apps:
