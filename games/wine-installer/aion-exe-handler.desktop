@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=Aion Wine Game Installer
 Comment=Install Windows games with one click
-Exec=/usr/bin/python3 /usr/lib/aion/wine-installer/wine-game-installer.py
+Exec=/usr/bin/python3 /opt/aion/games/wine-installer/wine-game-installer.py
 Type=Application
 Categories=Game;Utility;
 Icon=application-x-executable

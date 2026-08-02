@@ -5,6 +5,8 @@ PartOf=graphical-session.target
 
 [Service]
 Type=simple
+User=aion
+Group=aion
 Environment=DISPLAY=:0
 Environment=XAUTHORITY=%h/.Xauthority
 ExecStart=/usr/bin/python3 /usr/lib/aion/theme-switcher/nexus-theme-switcher.py

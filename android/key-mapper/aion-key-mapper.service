@@ -8,7 +8,7 @@ Wants=graph-session.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 /opt/aion/android/key-mapper/key-mapper-daemon.py
+ExecStart=/usr/bin/python3 /usr/lib/aion/android/key-mapper/key-mapper-daemon.py
 ExecStartPre=/bin/sleep 3
 ExecStop=/bin/kill -SIGTERM $MAINPID
 Restart=always

@@ -1165,19 +1165,46 @@ class OOBEWizard(QMainWindow):
         except PermissionError:
             pass
 
-        try:
-            with open(CONFIG_FILE, "w") as f:
-                json.dump(config, f, indent=2)
-        except (PermissionError, OSError) as e:
-            print(f"Warning: Could not write config: {e}", file=sys.stderr)
-
-        try:
-            MARKER_FILE.touch(exist_ok=True)
-        except (PermissionError, OSError):
-            pass
+        if not self._write_root(CONFIG_FILE, json.dumps(config, indent=2)):
+            print("Warning: Could not write config.", file=sys.stderr)
+        if not self._touch_root(MARKER_FILE):
+            print("Warning: Could not write completion marker.", file=sys.stderr)
 
         self._cleanup()
         QApplication.quit()
+
+    def _write_root(self, path: Path, content: str) -> bool:
+        try:
+            with open(path, "w") as f:
+                f.write(content)
+            return True
+        except (PermissionError, OSError):
+            pass
+        try:
+            import subprocess
+            proc = subprocess.run(
+                ["sudo", "tee", str(path)],
+                input=content, capture_output=True, text=True, timeout=30,
+            )
+            return proc.returncode == 0
+        except (subprocess.SubprocessError, FileNotFoundError, OSError):
+            return False
+
+    def _touch_root(self, path: Path) -> bool:
+        try:
+            path.touch(exist_ok=True)
+            return True
+        except (PermissionError, OSError):
+            pass
+        try:
+            import subprocess
+            proc = subprocess.run(
+                ["sudo", "touch", str(path)],
+                capture_output=True, text=True, timeout=30,
+            )
+            return proc.returncode == 0
+        except (subprocess.SubprocessError, FileNotFoundError, OSError):
+            return False
 
     def _cleanup(self):
         if self.controller_thread:
@@ -1228,6 +1255,10 @@ def acquire_lock():
 
 
 def main():
+    if MARKER_FILE.exists():
+        print("OOBE already completed.", file=sys.stderr)
+        sys.exit(0)
+
     if not acquire_lock():
         print("Another OOBE instance is running.", file=sys.stderr)
         sys.exit(1)

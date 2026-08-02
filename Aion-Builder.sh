@@ -700,7 +700,6 @@ UUID=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX  /            btrfs   rw,noatime,compr
 UUID=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX  /.snapshots  btrfs   rw,noatime,compress=zstd:3,ssd,discard=async,subvol=/@snapshots 0  0
 UUID=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX  /home        btrfs   rw,noatime,compress=zstd:3,ssd,discard=async,subvol=/@home    0  0
 UUID=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX  /var         btrfs   rw,noatime,compress=zstd:3,ssd,discard=async,subvol=/@var     0  0
-UUID=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX  /var/cache   btrfs   rw,noatime,compress=zstd:3,ssd,discard=async,subvol=/@cache   0  0
 UUID=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX  /boot/efi    vfat    rw,noatime,fmask=0077,dmask=0077,codepage=437,iocharset=ascii,shortname=mixed,errors=remount-ro 0  0
 tmpfs                                     /tmp         tmpfs   nosuid,nodev,noatime,size=4G                            0  0
 FSTABEOF
@@ -789,6 +788,60 @@ deploy_core_components() {
         log_success "  core/services → /usr/lib/aion/services/"
     else
         log_warn "  core/services/ not found, skipping"
+    fi
+
+    # Audio routing (script is invoked as /usr/local/bin/aion-audio-routing.sh)
+    if [[ -d "${SCRIPT_DIR}/core/audio" ]]; then
+        mkdir -p "${AIROOTFS}/usr/local/bin"
+        cp -a "${SCRIPT_DIR}/core/audio/aion-audio-routing.sh" "${AIROOTFS}/usr/local/bin/aion-audio-routing.sh"
+        chmod +x "${AIROOTFS}/usr/local/bin/aion-audio-routing.sh"
+        cp -a "${SCRIPT_DIR}/core/audio/"*.conf "${AIROOTFS}/etc/pipewire/pipewire.conf.d/" 2>/dev/null || true
+        cp -a "${SCRIPT_DIR}/core/audio/"*.conf "${AIROOTFS}/etc/wireplumber/" 2>/dev/null || true
+        log_success "  core/audio → /usr/local/bin/ + wireplumber configs"
+    else
+        log_warn "  core/audio/ not found, skipping"
+    fi
+
+    # Network port forwarding (script is invoked as /usr/local/bin/aion-port-forward.sh)
+    if [[ -d "${SCRIPT_DIR}/core/network" ]]; then
+        mkdir -p "${AIROOTFS}/usr/local/bin"
+        cp -a "${SCRIPT_DIR}/core/network/aion-port-forward.sh" "${AIROOTFS}/usr/local/bin/aion-port-forward.sh"
+        chmod +x "${AIROOTFS}/usr/local/bin/aion-port-forward.sh"
+        log_success "  core/network → /usr/local/bin/"
+    else
+        log_warn "  core/network/ not found, skipping"
+    fi
+
+    # Telemetry collector (invoked as /usr/lib/aion/telemetry_collector.py)
+    if [[ -d "${SCRIPT_DIR}/core/telemetry" ]]; then
+        cp -a "${SCRIPT_DIR}/core/telemetry/telemetry_collector.py" "${AIROOTFS}/usr/lib/aion/telemetry_collector.py"
+        log_success "  core/telemetry → /usr/lib/aion/telemetry_collector.py"
+    else
+        log_warn "  core/telemetry/ not found, skipping"
+    fi
+
+    # Hardware adapter (services reference /opt/aion/core/hardware-adapter/<module>/)
+    if [[ -d "${SCRIPT_DIR}/core/hardware-adapter" ]]; then
+        mkdir -p "${AIROOTFS}/opt/aion/core/hardware-adapter"
+        for module_dir in "${SCRIPT_DIR}/core/hardware-adapter/"*/; do
+            local module_name
+            module_name="$(basename "${module_dir}")"
+            mkdir -p "${AIROOTFS}/opt/aion/core/hardware-adapter/${module_name}"
+            cp -a "${module_dir}"* "${AIROOTFS}/opt/aion/core/hardware-adapter/${module_name}/"
+            # GPU scripts are also exposed on PATH for legacy invocations
+            if [[ "${module_name}" == "gpu" ]]; then
+                mkdir -p "${AIROOTFS}/usr/local/bin"
+                for script in gpu-autodetect.sh egpu-daemon.sh; do
+                    if [[ -f "${module_dir}${script}" ]]; then
+                        cp -a "${module_dir}${script}" "${AIROOTFS}/usr/local/bin/${script}"
+                        chmod +x "${AIROOTFS}/usr/local/bin/${script}"
+                    fi
+                done
+            fi
+        done
+        log_success "  core/hardware-adapter → /opt/aion/core/hardware-adapter/"
+    else
+        log_warn "  core/hardware-adapter/ not found, skipping"
     fi
 
     # Single source of truth for subvolume names/label (consumed by
@@ -955,6 +1008,70 @@ deploy_ui_components() {
     else
         log_warn "  ui/icons/ not found, skipping"
     fi
+
+    # Live wallpaper (service references /opt/aion/ui/live-wallpaper/)
+    if [[ -d "${SCRIPT_DIR}/ui/live-wallpaper" ]]; then
+        mkdir -p "${AIROOTFS}/opt/aion/ui/live-wallpaper"
+        cp -a "${SCRIPT_DIR}/ui/live-wallpaper/"* "${AIROOTFS}/opt/aion/ui/live-wallpaper/"
+        log_success "  ui/live-wallpaper → /opt/aion/ui/live-wallpaper/"
+    else
+        log_warn "  ui/live-wallpaper/ not found, skipping"
+    fi
+
+    # Default live-wallpaper content dir (referenced by config defaults)
+    mkdir -p "${AIROOTFS}/usr/share/aion/live-wallpapers"
+
+    # Default live-wallpaper config (read/written by live-wallpaper daemon)
+    mkdir -p "${AIROOTFS}/etc/aion"
+    cat > "${AIROOTFS}/etc/aion/live-wallpaper.json" << 'LWCONF'
+{
+  "wallpaper_dir": "/usr/share/aion/live-wallpapers",
+  "user_wallpaper_dir": "~/Videos/Aion-Wallpapers",
+  "current_wallpaper": "",
+  "hw_decoding": "auto",
+  "vo_backend": "auto",
+  "max_fps": 30,
+  "volume": 50,
+  "mute": false
+}
+LWCONF
+    log_success "  live-wallpaper config → /etc/aion/live-wallpaper.json"
+
+    # Game capture (service references /opt/aion/ui/game-capture/)
+    if [[ -d "${SCRIPT_DIR}/ui/game-capture" ]]; then
+        mkdir -p "${AIROOTFS}/opt/aion/ui/game-capture"
+        cp -a "${SCRIPT_DIR}/ui/game-capture/"* "${AIROOTFS}/opt/aion/ui/game-capture/"
+        log_success "  ui/game-capture → /opt/aion/ui/game-capture/"
+    else
+        log_warn "  ui/game-capture/ not found, skipping"
+    fi
+
+    # Default game-capture config (read by game-capture-daemon)
+    mkdir -p "${AIROOTFS}/etc/aion"
+    cat > "${AIROOTFS}/etc/aion/capture-config.json" << 'CAPCONF'
+{
+  "enabled": true,
+  "buffer_seconds": 30,
+  "fps": 60,
+  "resolution": "native",
+  "encoder": "vaapi",
+  "quality": "balanced",
+  "save_path": "~/Videos/Aion-Capture",
+  "trigger_combo": "Guide+RB",
+  "trigger_hold_ms": 2000,
+  "pause_wallpaper": true
+}
+CAPCONF
+    log_success "  game-capture config → /etc/aion/capture-config.json"
+
+    # Theme switcher (service references /usr/lib/aion/theme-switcher/)
+    if [[ -d "${SCRIPT_DIR}/ui/theme-switcher" ]]; then
+        mkdir -p "${AIROOTFS}/usr/lib/aion/theme-switcher"
+        cp -a "${SCRIPT_DIR}/ui/theme-switcher/"*.py "${AIROOTFS}/usr/lib/aion/theme-switcher/"
+        log_success "  ui/theme-switcher → /usr/lib/aion/theme-switcher/"
+    else
+        log_warn "  ui/theme-switcher/ not found, skipping"
+    fi
 }
 
 # Copy Android/Waydroid integration into the ISO filesystem.
@@ -974,11 +1091,18 @@ deploy_performance_components() {
     log_info "Deploying performance components..."
 
     if [[ -d "${SCRIPT_DIR}/performance" ]]; then
-        cp -a "${SCRIPT_DIR}/performance/compression/"* "${AIROOTFS}/etc/aion/performance/compression/" 2>/dev/null || true
-        cp -a "${SCRIPT_DIR}/performance/throttler/"* "${AIROOTFS}/etc/aion/performance/throttler/" 2>/dev/null || true
+        # Services reference the runnable scripts under /opt/aion/performance.
+        for perf_dir in engine throttler compression; do
+            if [[ -d "${SCRIPT_DIR}/performance/${perf_dir}" ]]; then
+                mkdir -p "${AIROOTFS}/opt/aion/performance/${perf_dir}"
+                cp -a "${SCRIPT_DIR}/performance/${perf_dir}/"*.py "${AIROOTFS}/opt/aion/performance/${perf_dir}/" 2>/dev/null || true
+                cp -a "${SCRIPT_DIR}/performance/${perf_dir}/"*.sh "${AIROOTFS}/opt/aion/performance/${perf_dir}/" 2>/dev/null || true
+                chmod +x "${AIROOTFS}/opt/aion/performance/${perf_dir}/"* 2>/dev/null || true
+            fi
+        done
+        # Static config (zram generator, etc.) stays under /etc/aion/performance.
         cp -a "${SCRIPT_DIR}/performance/zram/"* "${AIROOTFS}/etc/aion/performance/zram/" 2>/dev/null || true
-        cp -a "${SCRIPT_DIR}/performance/engine/"* "${AIROOTFS}/etc/aion/performance/engine/" 2>/dev/null || true
-        log_success "  performance/* → /etc/aion/performance/"
+        log_success "  performance/* → /opt/aion/performance/ + /etc/aion/performance/"
     else
         log_warn "  performance/ not found, skipping"
     fi
@@ -1011,16 +1135,64 @@ deploy_all_components() {
     deploy_android_components
     deploy_performance_components
     deploy_features
+    deploy_games_components
     deploy_hub_components
     deploy_config_components
+    deploy_ota_components
     log_success "All components deployed"
+}
+
+# Copy game tooling (tweak hub, wine installer) into the ISO filesystem.
+# The services reference /opt/aion/games/<module>/ paths.
+deploy_games_components() {
+    log_info "Deploying games components..."
+
+    if [[ ! -d "${SCRIPT_DIR}/games" ]]; then
+        log_warn "  games/ not found, skipping"
+        return 0
+    fi
+
+    if [[ -d "${SCRIPT_DIR}/games/tweak-hub" ]]; then
+        mkdir -p "${AIROOTFS}/opt/aion/games/tweak-hub"
+        cp -a "${SCRIPT_DIR}/games/tweak-hub/"*.py "${AIROOTFS}/opt/aion/games/tweak-hub/"
+        chmod +x "${AIROOTFS}/opt/aion/games/tweak-hub/"*.py 2>/dev/null || true
+        log_success "  games/tweak-hub → /opt/aion/games/tweak-hub/"
+    fi
+
+    if [[ -d "${SCRIPT_DIR}/games/wine-installer" ]]; then
+        mkdir -p "${AIROOTFS}/opt/aion/games/wine-installer"
+        cp -a "${SCRIPT_DIR}/games/wine-installer/"*.py "${AIROOTFS}/opt/aion/games/wine-installer/" 2>/dev/null || true
+        cp -a "${SCRIPT_DIR}/games/wine-installer/wine-optimize.sh" "${AIROOTFS}/opt/aion/games/wine-installer/" 2>/dev/null || true
+        log_success "  games/wine-installer → /opt/aion/games/wine-installer/"
+    fi
+}
+
+# Copy OTA update machinery into the ISO filesystem.
+# ota-updater.py runs as /usr/lib/aion/ota-updater.py; the release public key
+# lives in /etc/aion/gpg/ so signatures can be verified without network writes.
+deploy_ota_components() {
+    log_info "Deploying OTA components..."
+
+    if [[ ! -d "${SCRIPT_DIR}/deploy/ota" ]]; then
+        log_warn "  deploy/ota/ not found, skipping"
+        return 0
+    fi
+
+    cp -a "${SCRIPT_DIR}/deploy/ota/ota-updater.py" "${AIROOTFS}/usr/lib/aion/ota-updater.py" 2>/dev/null || true
+    cp -a "${SCRIPT_DIR}/deploy/ota/ota_compression.py" "${AIROOTFS}/usr/lib/aion/ota_compression.py" 2>/dev/null || true
+    chmod +x "${AIROOTFS}/usr/lib/aion/ota-updater.py" 2>/dev/null || true
+
+    mkdir -p "${AIROOTFS}/etc/aion/gpg"
+    if [[ -f "${SCRIPT_DIR}/deploy/ota/aion-release.asc" ]]; then
+        cp -a "${SCRIPT_DIR}/deploy/ota/aion-release.asc" "${AIROOTFS}/etc/aion/gpg/aion-release.asc"
+    fi
+    log_success "  deploy/ota → /usr/lib/aion/ota-updater.py + /etc/aion/gpg/"
 }
 
 # Copy the Aion Hub portal (server, manifest, web assets, password helper)
 # into the ISO filesystem under /opt/aion/hub.
 deploy_hub_components() {
     log_info "Deploying Aion Hub..."
-
     if [[ -d "${SCRIPT_DIR}/hub" ]]; then
         mkdir -p "${AIROOTFS}/opt/aion/hub"
         cp -a "${SCRIPT_DIR}/hub/." "${AIROOTFS}/opt/aion/hub/"
@@ -1047,19 +1219,29 @@ enable_systemd_services() {
         "aion-init.service"
         "aion-security.service"
         "aion-input.service"
-        "aion-oobe.service"
         "aion-throttler.service"
         "aion-chameleon-memory.service"
+        "aion-gpu-autodetect.service"
         "aion-gpu-profiler.service"
+        "aion-egpu.service"
         "aion-storage-optimizer.service"
         "aion-performance-engine.service"
+        "aion-telemetry.service"
         "aion-hub.service"
+        "aion-key-mapper.service"
+        "aion-live-wallpaper.service"
+        "aion-game-capture.service"
+        "nexus-theme-switcher.service"
+        "nexus-tweak-hub.service"
+        "aion-gpu-monitor.service"
+        "aion-ota.service"
+        "aion-ota-silent.service"
     )
 
     for svc in "${service_files[@]}"; do
         local found=0
         # Search all source directories for this service file
-        for search_dir in "${SCRIPT_DIR}/core" "${SCRIPT_DIR}/ui" "${SCRIPT_DIR}/performance" "${SCRIPT_DIR}/hub"; do
+        for search_dir in "${SCRIPT_DIR}/core" "${SCRIPT_DIR}/ui" "${SCRIPT_DIR}/performance" "${SCRIPT_DIR}/hub" "${SCRIPT_DIR}/games" "${SCRIPT_DIR}/deploy/ota"; do
             local svc_path
             svc_path="$(find "${search_dir}" -name "${svc}" -type f 2>/dev/null | head -n1)"
             if [[ -n "${svc_path}" ]]; then
@@ -1096,6 +1278,22 @@ WantedBy=multi-user.target
 BOOTEOF
     ln -sf /etc/systemd/system/aion-boot-setup.service \
         "${services_wants}/aion-boot-setup.service"
+
+    # Create the Aion user-session target that UI/game services bind to.
+    # It is pulled in by the graphical session and starts the live-wallpaper,
+    # game-capture, and tweak-hub daemons once the desktop is up.
+    cat > "${AIROOTFS}/etc/systemd/system/aion-session.target" << 'SESSIONTGT'
+[Unit]
+Description=Aion User Session Services
+After=graphical.target
+Wants=graphical.target
+PartOf=graphical.target
+
+[Install]
+WantedBy=graphical.target
+SESSIONTGT
+    ln -sf /etc/systemd/system/aion-session.target \
+        "${services_wants}/aion-session.target"
 
     # Enable audio routing service
     cat > "${AIROOTFS}/etc/systemd/system/aion-audio-routing.service" << 'AUDIOSVC'

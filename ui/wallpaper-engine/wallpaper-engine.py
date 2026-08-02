@@ -163,9 +163,9 @@ def apply_plasma_wallpaper(path: str) -> bool:
 
 def apply_kwin_color_scheme(color_hex: str) -> bool:
     r, g, b = _hex_to_rgb(color_hex)
-    run_cmd(["kwriteconfig5", "--file", "kdeglobals", "--group", "General",
+    run_cmd(["kwriteconfig6", "--file", "kdeglobals", "--group", "General",
              "--key", "AccentColor", f"{r},{g},{b}"])
-    run_cmd(["kwriteconfig5", "--file", "kdeglobals", "--group", "WM",
+    run_cmd(["kwriteconfig6", "--file", "kdeglobals", "--group", "WM",
              "--key", "activeBackground", f"{r},{g},{b}"])
     return run_cmd(["qdbus", "org.kde.KWin", "/KWin", "reconfigureConfiguration"])
 

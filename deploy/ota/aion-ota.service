@@ -17,7 +17,7 @@ Nice=10
 IOSchedulingClass=idle
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/log/aion /var/lib/aion /etc/aion /tmp
+ReadWritePaths=/var/log/aion /var/lib/aion /etc/aion /etc/aion/gpg /tmp
 NoNewPrivileges=false
 CapabilityBoundingSet=CAP_SYS_ADMIN CAP_FOWNER CAP_DAC_OVERRIDE
 

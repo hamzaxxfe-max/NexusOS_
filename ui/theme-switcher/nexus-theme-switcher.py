@@ -157,12 +157,20 @@ def set_titlebar_alignment(side: str) -> None:
 
 def restart_plasmashell() -> None:
     log.info("Restarting plasmashell …")
+    # Plasma 6: kquitapp5/kstart5 were removed; use kquitapp6 and launch plasmashell
+    # through its systemd unit (the canonical restart on Plasma 6 / Wayland).
     try:
-        subprocess.run(["kquitapp5", "plasmashell"], timeout=10, capture_output=True)
+        subprocess.run(["kquitapp6", "plasmashell"], timeout=10, capture_output=True)
     except Exception:
         pass
     time.sleep(1.5)
-    subprocess.Popen(["kstart5", "plasmashell"], start_new_session=True)
+    try:
+        subprocess.run(
+            ["systemctl", "--user", "restart", "plasma-plasmashell.service"],
+            timeout=15, capture_output=True,
+        )
+    except Exception:
+        subprocess.Popen(["plasmashell"], start_new_session=True)
     log.info("plasmashell restarted")
 
 

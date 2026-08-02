@@ -6,10 +6,13 @@ PartOf=aion-session.target
 
 [Service]
 Type=simple
+User=aion
+Group=aion
 ExecStart=/usr/bin/python3 /opt/aion/ui/live-wallpaper/live-wallpaper.py
 Restart=always
 RestartSec=5
 Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/aion/.Xauthority
 Environment=XDG_RUNTIME_DIR=/run/user/%U
 Environment=HOME=%h
 WorkingDirectory=/opt/aion/ui/live-wallpaper

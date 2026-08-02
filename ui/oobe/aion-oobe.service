@@ -1,17 +1,14 @@
 [Unit]
 Description=Aion Out-of-Box Experience Wizard
-After=graphical.target
+After=graphical.target plasma-plasmashell.service
 ConditionPathExists=!/etc/aion/.oobe-complete
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 /usr/share/aion/oobe/oobe_wizard.py
-Environment=DISPLAY=:0
+ExecStart=/usr/bin/python3 /usr/lib/aion/oobe/oobe_wizard.py
 Restart=on-failure
-User=%i
-Group=%i
 StandardOutput=journal
 StandardError=journal
 
 [Install]
-WantedBy=graphical.target
+WantedBy=graphical-session.target

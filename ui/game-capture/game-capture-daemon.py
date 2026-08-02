@@ -497,7 +497,8 @@ class CaptureEngine:
 
 
 class InputMonitor:
-    EVIOCGBIT = 0x80084502
+    # EVIOCGBIT(EV_ABS, 8) = _IOC(_IOC_READ, 'E', 0x20 + EV_ABS, 8)
+    EVIOCGBIT = 0x80084523
     EV_ABS = 3
     ABS_X = 0
     ABS_HAT0X = 16

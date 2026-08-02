@@ -6,7 +6,7 @@ from pathlib import Path
 PROJ_ROOT = Path(__file__).resolve().parents[2]
 
 # Required Btrfs subvolumes
-REQUIRED_SUBVOLUMES = ["@", "@home", "@var-log", "@tmp", "@snapshots"]
+REQUIRED_SUBVOLUMES = ["@", "@home", "@var", "@tmp", "@snapshots"]
 
 # Expected mount options for root
 ROOT_MOUNT_OPTIONS = [

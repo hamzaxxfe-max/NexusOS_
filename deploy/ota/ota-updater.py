@@ -25,7 +25,8 @@ try:
 except ImportError:
     _decompress_archive = None
 
-CONFIG_PATH = Path("/etc/aion/config.json")
+CONFIG_PATH = Path("/etc/aion/aion-config.json")
+CONFIG_PATH_LEGACY = Path("/etc/aion/config.json")
 MANIFEST_URL = "https://raw.githubusercontent.com/username/aion/main/manifest.json"
 MANIFEST_CACHE = Path("/var/cache/aion/manifest.json")
 LOG_DIR = Path("/var/log/aion")
@@ -39,6 +40,8 @@ RETRY_DELAY = 5
 CURL_TIMEOUT = 300
 AB_MANAGER = Path("/usr/bin/aion-ab-manager")
 AB_STATE = Path("/etc/aion-ab-state")
+GPG_BIN = "gpg"
+GPG_KEYRING = Path("/etc/aion/gpg/aion-release.asc")
 
 logger = logging.getLogger("aion-ota")
 
@@ -61,7 +64,12 @@ def setup_logging() -> None:
 # ── A/B Slot Management ──────────────────────────────────────────────
 
 def get_active_slot() -> str:
-    """Get the current active boot slot (A or B)."""
+    """Get the current active boot slot (active or alt).
+
+    Slot names mirror build/constants.sh subvolumes: the active root is `@`
+    and the alternate/inactive root is `@alt`. These are the ONLY two root
+    slots on disk — do not introduce `@A`/`@B` names here.
+    """
     if AB_MANAGER.exists():
         try:
             result = subprocess.run(
@@ -71,7 +79,7 @@ def get_active_slot() -> str:
             for line in result.stdout.strip().split("\n"):
                 if line.startswith("Active slot:"):
                     slot = line.split(":")[-1].strip()
-                    if slot in ("A", "B"):
+                    if slot in ("active", "alt"):
                         return slot
         except (subprocess.TimeoutExpired, Exception) as e:
             logger.warning("Failed to get active slot via manager: %s", e)
@@ -81,25 +89,26 @@ def get_active_slot() -> str:
     for entry in entries_dir.glob("aion-*.conf"):
         try:
             content = entry.read_text()
-            if "active" in content:
-                if "Slot A" in content:
-                    return "A"
-                elif "Slot B" in content:
-                    return "B"
+            if "active" in content and "alternate" not in content.lower():
+                return "active"
+            if "alternate" in content.lower():
+                return "alt"
         except Exception:
             continue
 
-    return "A"
+    return "active"
 
 
 def get_inactive_slot() -> str:
     """Get the inactive boot slot (target for updates)."""
-    return "B" if get_active_slot() == "A" else "A"
+    return "alt" if get_active_slot() == "active" else "active"
 
 
 def get_slot_subvol(slot: str) -> str:
     """Get the Btrfs subvolume for a given slot."""
-    return f"@{slot}"
+    if slot == "alt":
+        return "@alt"
+    return "@"
 
 
 def set_boot_slot(slot: str) -> bool:
@@ -125,18 +134,18 @@ def set_boot_slot(slot: str) -> bool:
     try:
         for entry in entries_dir.glob("aion-*.conf"):
             content = entry.read_text()
-            if f"Slot {slot}" in content and "active" not in content:
-                content = content.replace(f"Slot {slot}", f"Slot {slot} (active)")
-                entry.write_text(content)
-            elif "active" in content and f"Slot {slot}" not in content:
-                content = content.replace(" (active)", "")
-                entry.write_text(content)
+            is_target = f"aion-{slot}.conf" in entry.name
+            if is_target:
+                content = content.replace("(Alternate Slot)", "(Active Slot)")
+            else:
+                content = content.replace("(Active Slot)", "(Alternate Slot)")
+            entry.write_text(content)
 
         # Update default in loader.conf
         loader_content = loader_conf.read_text()
         loader_content = loader_content.replace(
-            "default aion-a.conf" if slot == "B" else "default aion-b.conf",
-            f"default aion-{slot.lower()}.conf",
+            f"default aion-{get_inactive_slot()}.conf",
+            f"default aion-{slot}.conf",
         )
         loader_conf.write_text(loader_content)
 
@@ -149,10 +158,11 @@ def set_boot_slot(slot: str) -> bool:
 
 
 def load_system_config() -> dict:
-    if not CONFIG_PATH.exists():
+    path = CONFIG_PATH if CONFIG_PATH.exists() else CONFIG_PATH_LEGACY
+    if not path.exists():
         logger.error("System config not found at %s", CONFIG_PATH)
         sys.exit(1)
-    with open(CONFIG_PATH, "r") as f:
+    with open(path, "r") as f:
         return json.load(f)
 
 
@@ -193,6 +203,19 @@ def fetch_manifest(use_cache: bool = False) -> dict:
             MANIFEST_CACHE.parent.mkdir(parents=True, exist_ok=True)
             with open(MANIFEST_CACHE, "w") as f:
                 json.dump(manifest, f, indent=2)
+
+            signature_url = manifest.get("manifest_signature_url") or (MANIFEST_URL + ".sig")
+            sig_path = Path(str(MANIFEST_CACHE) + ".sig")
+            sig_result = subprocess.run(
+                ["curl", "-fsSL", "--connect-timeout", "30", "--max-time", "120", "-o", str(sig_path), signature_url],
+                capture_output=True, text=True, timeout=150,
+            )
+            if sig_result.returncode != 0:
+                logger.warning("Manifest signature download failed: %s", sig_result.stderr)
+            elif not verify_gpg_signature(MANIFEST_CACHE, sig_path):
+                logger.error("Manifest signature verification FAILED; refusing untrusted manifest")
+                sys.exit(1)
+
             logger.info("Manifest fetched successfully, latest version: %s", manifest.get("latest_version"))
             return manifest
 
@@ -292,6 +315,59 @@ def verify_checksum(file_path: Path, expected_sha256: str) -> bool:
 
     logger.error("Checksum mismatch: expected %s, got %s", expected_sha256, actual_sha256)
     return False
+
+
+def verify_gpg_signature(file_path: Path, signature_path: Path) -> bool:
+    """Verify a detached GPG signature over a payload using the Aion release key.
+
+    This runs BEFORE checksum verification and BEFORE any mount, so a tampered
+    or unsigned artifact is rejected as early as possible.
+    """
+    if not signature_path.exists():
+        logger.error("Signature file not found: %s", signature_path)
+        return False
+    if not file_path.exists():
+        logger.error("Payload missing for signature verification: %s", file_path)
+        return False
+    if not GPG_KEYRING.exists():
+        logger.error("GPG keyring not found at %s", GPG_KEYRING)
+        return False
+
+    logger.info("Verifying GPG signature of %s", file_path.name)
+    temp_keyring = Path(f"{GPG_KEYRING}.tmp-{os.getpid()}.gpg")
+    try:
+        import_result = subprocess.run(
+            [GPG_BIN, "--batch", "--no-default-keyring", "--keyring", str(temp_keyring), "--import", str(GPG_KEYRING)],
+            capture_output=True, text=True, timeout=60,
+        )
+        if import_result.returncode != 0:
+            logger.error("Failed to import release key: %s", import_result.stderr.strip()[:300])
+            return False
+
+        result = subprocess.run(
+            [
+                GPG_BIN, "--batch", "--no-default-keyring", "--keyring", str(temp_keyring),
+                "--verify", str(signature_path), str(file_path),
+            ],
+            capture_output=True, text=True, timeout=120,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+        logger.error("GPG verification could not run: %s", e)
+        return False
+    finally:
+        try:
+            if temp_keyring.exists():
+                temp_keyring.unlink()
+        except OSError:
+            pass
+
+    if result.returncode != 0:
+        logger.error("GPG signature verification FAILED for %s: %s",
+                     file_path.name, result.stderr.strip()[:500])
+        return False
+
+    logger.info("GPG signature verification passed for %s", file_path.name)
+    return True
 
 
 _MAGIC_ZST = b"\x28\xb5\x2f\xfd"
@@ -499,6 +575,18 @@ def apply_incremental_patch(patch_info: dict, target_snapshot: str) -> bool:
     if not download_file(patch_url, patch_file, "incremental patch"):
         return False
 
+    # GPG signature check runs BEFORE decompression, the checksum, and
+    # BEFORE any mount — it validates the exact shipped patch artifact.
+    patch_sig_url = patch_info.get("signature_url")
+    if patch_sig_url:
+        patch_sig = Path(str(patch_file) + ".sig")
+        if not download_file(patch_sig_url, patch_sig, "patch GPG signature"):
+            patch_file.unlink()
+            return False
+        if not verify_gpg_signature(patch_file, patch_sig):
+            patch_file.unlink()
+            return False
+
     patch_file = prepare_downloaded_file(patch_file)
 
     if not verify_checksum(patch_file, patch_sha256):
@@ -553,7 +641,7 @@ def set_next_boot_snapshot(snapshot_name: str) -> bool:
         try:
             import re
             content = btrfs_opts.read_text()
-            content = re.sub(r"subvol=@[AB]", f"subvol={get_slot_subvol(inactive)}", content)
+            content = re.sub(r"subvol=@(?:alt)?", f"subvol={get_slot_subvol(inactive)}", content)
             btrfs_opts.write_text(content)
             logger.info("fstab updated for slot %s", inactive)
         except Exception as e:
@@ -692,19 +780,10 @@ def apply_update(silent: bool = False) -> bool:
 
     logger.info("Applying update: %s → %s (writing to Slot %s)", current, latest, inactive)
 
-    # Step 1: Mount inactive slot subvolume
-    BTRFS_MOUNT.mkdir(parents=True, exist_ok=True)
-    try:
-        subprocess.run(
-            ["mount", "-o", f"subvol={inactive_subvol}", "/dev/disk/by-label/aion", str(BTRFS_MOUNT)],
-            capture_output=True, text=True, timeout=60,
-            check=True,
-        )
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
-        logger.error("Failed to mount inactive slot: %s", e)
-        return False
+    # Note: no pre-mount here. apply_full_update / apply_incremental_patch each
+    # mount the target slot once (and unmount it), so mounting BTRFS_MOUNT in
+    # this step would double-mount the same subvolume.
 
-    # Step 2: Apply update (incremental or full)
     success = False
     if result["incremental_available"]:
         success = apply_incremental_patch(result["patch_info"], inactive_subvol)
@@ -712,7 +791,6 @@ def apply_update(silent: bool = False) -> bool:
         iso_url = manifest.get("download_url", "")
         if not iso_url:
             logger.error("No download URL in manifest")
-            subprocess.run(["umount", str(BTRFS_MOUNT)], capture_output=True, timeout=30)
             return False
 
         iso_cache = Path("/var/cache/aion/isos")
@@ -721,20 +799,30 @@ def apply_update(silent: bool = False) -> bool:
 
         if not iso_file.exists():
             if not download_file(iso_url, iso_file, f"ISO v{latest}"):
-                subprocess.run(["umount", str(BTRFS_MOUNT)], capture_output=True, timeout=30)
                 return False
+
+            # GPG signature check runs BEFORE decompression, the checksum,
+            # and BEFORE any mount — it validates the exact shipped artifact.
+            iso_sig_url = manifest.get("signature_url")
+            if iso_sig_url:
+                iso_sig = Path(str(iso_file) + ".sig")
+                if not download_file(iso_sig_url, iso_sig, "ISO GPG signature"):
+                    iso_file.unlink()
+                    return False
+                if not verify_gpg_signature(iso_file, iso_sig):
+                    iso_file.unlink()
+                    return False
 
             iso_file = prepare_downloaded_file(iso_file)
 
             iso_sha256 = manifest.get("sha256", "")
             if iso_sha256 and not verify_checksum(iso_file, iso_sha256):
                 iso_file.unlink()
-                subprocess.run(["umount", str(BTRFS_MOUNT)], capture_output=True, timeout=30)
                 return False
 
         success = apply_full_update(iso_file, inactive_subvol)
 
-    # Step 3: Unmount
+    # Safety unmount (no-op when nothing is mounted)
     subprocess.run(["umount", str(BTRFS_MOUNT)], capture_output=True, timeout=30)
 
     if not success:

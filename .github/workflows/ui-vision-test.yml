@@ -1,0 +1,66 @@
+name: UI Vision Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      apps:
+        description: 'Which UI to test (oobe|theme|wallpaper|all)'
+        required: false
+        default: 'all'
+  pull_request:
+    paths:
+      - 'ui/**'
+      - 'deploy/ui-test/**'
+      - 'config/**'
+
+permissions:
+  contents: read
+
+jobs:
+  ui-vision-test:
+    name: Render & Inspect Aion UI
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install display & UI dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            xvfb xdotool scrot imagemagick \
+            python3-pyqt6 python3-pip \
+            x11-utils wmctrl dbus-x11 fonts-noto-core
+          python3 -m pip install --quiet --break-system-packages pytest pytest-qt 2>/dev/null || \
+            python3 -m pip install --quiet --user pytest pytest-qt
+
+      - name: Run UI capture driver
+        id: ui
+        run: |
+          sudo mkdir -p /workspace
+          sudo cp -a "${GITHUB_WORKSPACE}" /workspace/repo
+          sudo chmod -R a+rX /workspace/repo
+          sudo -E bash /workspace/repo/deploy/ui-test/ui-driver.sh \
+            --root /workspace/repo --display :99 --out /tmp/aion-ui \
+            --app "${{ github.event.inputs.apps || 'all' }}"
+
+      - name: Verify screenshots were produced
+        run: |
+          COUNT=$(ls -1 /tmp/aion-ui/*.png 2>/dev/null | wc -l)
+          echo "screenshots=$COUNT" >> "$GITHUB_OUTPUT"
+          if [ "$COUNT" -eq 0 ]; then
+            echo "::error::No screenshots captured — UI failed to render"
+            exit 1
+          fi
+
+      - name: Upload screenshots & report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aion-ui-vision
+          path: |
+            /tmp/aion-ui/*.png
+            /tmp/aion-ui/*.log
+            /tmp/aion-ui/report.md
+          retention-days: 14

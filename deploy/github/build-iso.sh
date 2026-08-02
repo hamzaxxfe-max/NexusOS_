@@ -259,6 +259,19 @@ CLEANSVC
 configure_aion() {
     log "Configuring Aion system files..."
 
+    # Install the Aion OTA release public key for GPG signature verification.
+    # ota-updater.py verifies every payload signature against this keyring
+    # BEFORE checksum verification and BEFORE mounting the target subvolume.
+    if [ -f "${SCRIPT_DIR}/../ota/aion-release.asc" ]; then
+        mkdir -p "$PROFILE_DIR/airootfs/etc/aion/gpg"
+        cp "${SCRIPT_DIR}/../ota/aion-release.asc" \
+            "$PROFILE_DIR/airootfs/etc/aion/gpg/aion-release.asc"
+        chmod 644 "$PROFILE_DIR/airootfs/etc/aion/gpg/aion-release.asc"
+        log "Installed OTA release public key to /etc/aion/gpg/aion-release.asc"
+    else
+        log "WARN: deploy/ota/aion-release.asc not found — OTA signatures cannot be verified"
+    fi
+
     cat > "$PROFILE_DIR/airootfs/etc/aion/config.json" << NEXUSCFG
 {
     "system": {

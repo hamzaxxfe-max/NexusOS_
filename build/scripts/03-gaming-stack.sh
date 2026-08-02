@@ -92,7 +92,12 @@ arch-chroot /mnt /bin/bash <<'CHROOT'
         zip \
         ntfs-3g \
         dosfstools \
-        exfatprogs
+        exfatprogs \
+        ffmpeg \
+        mpv \
+        xdotool \
+        xorg-xdpyinfo \
+        libnotify
 
     # ── Heroic Games Launcher (AUR helper needed) ────────────────────
     pacman -S --noconfirm yay

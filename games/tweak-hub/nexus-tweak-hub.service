@@ -5,10 +5,13 @@ PartOf=aion-session.target
 
 [Service]
 Type=simple
+User=aion
+Group=aion
 ExecStart=/usr/bin/python3 /opt/aion/games/tweak-hub/nexus-tweak-hub.py
 Restart=on-failure
 RestartSec=5
 Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/aion/.Xauthority
 Environment=QT_QPA_PLATFORM=xcb
 Environment=XDG_RUNTIME_DIR=/run/user/%U
 WorkingDirectory=/opt/aion/games/tweak-hub

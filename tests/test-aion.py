@@ -693,9 +693,11 @@ class TestUI(unittest.TestCase):
         self.assertIn(cfg["display"]["background_color"], plasma)
         self.assertIn(cfg["display"]["panel_color"], plasma)
 
-    def test_oobe_service_runs_as_user(self):
+    def test_oobe_service_runs_in_user_session(self):
         src = _read("ui/oobe/aion-oobe.service")
-        self.assertIn("User=%i", src, "OOBE should run as invoking user")
+        self.assertIn("graphical-session.target", src,
+                      "OOBE should start with the graphical user session")
+        self.assertNotIn("User=", src, "OOBE must not force a root system user")
 
     def test_oobe_service_conditional(self):
         src = _read("ui/oobe/aion-oobe.service")

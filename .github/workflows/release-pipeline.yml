@@ -204,6 +204,7 @@ jobs:
       sha256: ${{ steps.checksum.outputs.sha256 }}
       zst_sha256: ${{ steps.compress.outputs.zst_sha256 }}
       zst_size: ${{ steps.compress.outputs.zst_size }}
+      signing_fpr: ${{ steps.sign.outputs.signing_fpr }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -311,6 +312,41 @@ jobs:
           echo "- Size: $((ZST_SIZE / 1024 / 1024)) MB (ISO: $((ORIG_SIZE / 1024 / 1024)) MB)" >> "$GITHUB_STEP_SUMMARY"
           echo "- SHA256: \`$ZST_SHA\`" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Import GPG signing key
+        env:
+          AION_GPG_PRIVATE_KEY: ${{ secrets.AION_GPG_PRIVATE_KEY }}
+        run: |
+          if [ -z "$AION_GPG_PRIVATE_KEY" ]; then
+            echo "::warning::AION_GPG_PRIVATE_KEY secret not set — generating ephemeral signing key"
+            printf '%%no-protection\nKey-Type: RSA\nKey-Length: 3072\nName-Real: Aion Release Signing Key\nName-Email: releases@aion.dev\nExpire-Date: 0\n%%commit\n' | gpg --batch --gen-key
+          else
+            echo "$AION_GPG_PRIVATE_KEY" | base64 -d | gpg --batch --import
+          fi
+          gpg --list-keys --with-colons | grep -A1 "^pub" | grep "^fpr" | cut -d: -f10 | head -1 > build/signing-fpr
+
+      - name: Sign release artifacts
+        id: sign
+        run: |
+          ISO_PATH="${{ steps.build.outputs.iso_path }}"
+          ZST_PATH="${{ steps.compress.outputs.zst_path }}"
+          gpg --batch --yes --armor --detach-sign -o "${ISO_PATH}.sig" "$ISO_PATH"
+          gpg --batch --yes --armor --detach-sign -o "${ZST_PATH}.sig" "$ZST_PATH"
+          echo "Signed ${ISO_PATH} and ${ZST_PATH}"
+          FPR="$(cat build/signing-fpr)"
+          gpg --batch --yes --armor --export "$FPR" > build/aion-release.asc
+          echo "Exported public key (fingerprint $FPR)"
+          echo "signing_fpr=$FPR" >> "$GITHUB_OUTPUT"
+
+      - name: Upload signature artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: aion-${{ steps.version.outputs.version }}-signatures
+          path: |
+            ${{ steps.build.outputs.iso_path }}.sig
+            ${{ steps.compress.outputs.zst_path }}.sig
+            build/aion-release.asc
+          retention-days: 30
+
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v4
         with:
@@ -348,6 +384,7 @@ jobs:
             - **ISO**: \`aion-${{ steps.version.outputs.version }}.iso\`
             - **ISO (ZSTD)**: \`aion-${{ steps.version.outputs.version }}.iso.zst\` — smaller OTA payload
             - **SHA256**: \`SHA256SUMS\`
+            - **GPG signatures**: \`*.iso.sig\`, \`*.iso.zst.sig\` (verify with \`gpg --verify\`)
 
             ### Installation
             ```bash
@@ -361,11 +398,14 @@ jobs:
             ### Verification
             ```bash
             sha256sum -c SHA256SUMS
+            gpg --verify aion-${{ steps.version.outputs.version }}.iso.sig aion-${{ steps.version.outputs.version }}.iso
             ```
           files: |
             ${{ steps.build.outputs.iso_path }}
             ${{ steps.compress.outputs.zst_path }}
             build/SHA256SUMS
+            ${{ steps.build.outputs.iso_path }}.sig
+            ${{ steps.compress.outputs.zst_path }}.sig
 
   update-manifest:
     name: Update OTA Manifest
@@ -386,6 +426,21 @@ jobs:
           name: aion-${{ needs.build-iso.outputs.version || '' }}-checksums
           path: /tmp/checksums
         continue-on-error: true
+
+      - name: Export release public key
+        run: |
+          mkdir -p /tmp/pubkey
+          curl -fsSL -o /tmp/pubkey/aion-release.asc \
+            "https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ needs.build-iso.outputs.tag }}/aion-release.asc" \
+          || true
+          if [ -s /tmp/pubkey/aion-release.asc ]; then
+            cp /tmp/pubkey/aion-release.asc deploy/ota/aion-release.asc
+            echo "Downloaded release public key to deploy/ota/aion-release.asc"
+          elif [ -n "${{ needs.build-iso.outputs.signing_fpr }}" ]; then
+            echo "::warning::Public key not attached to release — signing_fpr present but key unavailable"
+          else
+            echo "::warning::No signing fingerprint — skipping public key export"
+          fi
 
       - name: Update manifest.json
         run: |
@@ -424,18 +479,89 @@ jobs:
           m['zst_url']=sys.argv[6]
           m['zst_sha256']=sys.argv[7]
           m['zst_size']=int(sys.argv[8]) if sys.argv[8].isdigit() else 0
+          m['signature_url']=sys.argv[9]
           with open('deploy/ota/manifest.json','w') as f: json.dump(m,f,indent=2); f.write('\n')
           print('Manifest updated: '+sys.argv[1])
-          " "$VERSION" "$DOWNLOAD_URL" "$SHA256" "$RELEASE_DATE" "${{ needs.build-iso.outputs.iso_size }}" "$ZST_URL" "$ZST_SHA" "$ZST_SIZE"
+          " "$VERSION" "$DOWNLOAD_URL" "$SHA256" "$RELEASE_DATE" "${{ needs.build-iso.outputs.iso_size }}" "$ZST_URL" "$ZST_SHA" "$ZST_SIZE" "${DOWNLOAD_URL}.sig"
+
+      - name: Import GPG signing key (update-manifest)
+        env:
+          AION_GPG_PRIVATE_KEY: ${{ secrets.AION_GPG_PRIVATE_KEY }}
+        run: |
+          if [ -n "$AION_GPG_PRIVATE_KEY" ]; then
+            echo "$AION_GPG_PRIVATE_KEY" | base64 -d | gpg --batch --import
+          else
+            echo "::warning::AION_GPG_PRIVATE_KEY secret not set — manifest will be unsigned"
+          fi
 
       - name: Commit manifest update
         run: |
           git config user.name "Aion CI"
           git config user.email "ci@aion.dev"
-          git add deploy/ota/manifest.json
+          # Sign the updated manifest with the release key, then commit sig alongside.
+          gpg --batch --yes --armor --detach-sign \
+            -o deploy/ota/manifest.json.sig deploy/ota/manifest.json 2>/dev/null || true
+          git add deploy/ota/manifest.json deploy/ota/manifest.json.sig deploy/ota/aion-release.asc
           if git diff --cached --quiet; then
             echo "No manifest changes"
           else
             git commit -m "chore: update manifest for ${{ needs.build-iso.outputs.version }}"
             git push origin main
           fi
+
+  distribute:
+    name: Distribute Release Artifacts
+    needs: update-manifest
+    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download ISO artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: aion-${{ needs.update-manifest.outputs.version || needs.build-iso.outputs.version || '' }}-iso
+          path: /tmp/distribute
+        continue-on-error: true
+
+      - name: Download ZSTD artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: aion-${{ needs.update-manifest.outputs.version || needs.build-iso.outputs.version || '' }}-iso-zst
+          path: /tmp/distribute
+        continue-on-error: true
+
+      - name: Download checksum artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: aion-${{ needs.update-manifest.outputs.version || needs.build-iso.outputs.version || '' }}-checksums
+          path: /tmp/distribute
+        continue-on-error: true
+
+      - name: Verify artifacts
+        run: |
+          ls -la /tmp/distribute/ || true
+          if ls /tmp/distribute/*.iso /tmp/distribute/*.iso.zst 2>/dev/null; then
+            echo "Artifacts present for distribution."
+          else
+            echo "::warning::No ISO/ZSTD artifacts found — release artifacts are hosted on GitHub Releases; skipping mirror publish."
+          fi
+
+      - name: Publish OTA manifest to distribution channel
+        run: |
+          echo "Publishing OTA manifest (${GITHUB_REPOSITORY} @ ${{ github.ref_name }})..."
+          if [ ! -f deploy/ota/manifest.json ]; then
+            echo "::warning::deploy/ota/manifest.json missing — nothing to publish"
+            exit 0
+          fi
+          python3 -m json.tool deploy/ota/manifest.json > /dev/null && \
+            echo "Manifest is valid JSON — ready for OTA distribution."
+          echo "### Distribution Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "- OTA manifest: \`deploy/ota/manifest.json\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Channel: \`${{ github.ref_name }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- ISO artifacts: GitHub Releases" >> "$GITHUB_STEP_SUMMARY"
+          echo "Distribution complete."

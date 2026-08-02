@@ -260,7 +260,7 @@ def create_btrfs_subvolumes(device):
         subprocess.run(
             ["mount", device, mnt], check=True, capture_output=True, timeout=30
         )
-        for subvol in ["@", "@home", "@var-log", "@tmp", "@snapshots"]:
+        for subvol in ["@", "@home", "@var", "@tmp", "@snapshots"]:
             subprocess.run(
                 ["btrfs", "subvolume", "create", f"{mnt}/{subvol}"],
                 check=True, capture_output=True, timeout=30
@@ -269,7 +269,7 @@ def create_btrfs_subvolumes(device):
     except subprocess.CalledProcessError as e:
         subprocess.run(["umount", mnt], capture_output=True)
         raise RuntimeError(f"Btrfs subvolume creation failed: {e}")
-    _log("Created Btrfs subvolumes: @, @home, @var-log, @tmp, @snapshots")
+    _log("Created Btrfs subvolumes: @, @home, @var, @tmp, @snapshots")
 
 
 def configure_grub_dualboot(device):
@@ -585,7 +585,7 @@ def _configure_fstab(target, device, part_num):
         root_uuid = uuid_result.stdout.strip()
         fstab_content = f"""UUID={root_uuid}  /          btrfs  defaults,noatime,compress=zstd:3  0  0
 UUID={root_uuid}  /home      btrfs  defaults,noatime,compress=zstd:3,subvol=@home  0  0
-UUID={root_uuid}  /var/log   btrfs  defaults,noatime,compress=zstd:3,subvol=@var-log  0  0
+UUID={root_uuid}  /var       btrfs  defaults,noatime,compress=zstd:3,subvol=@var  0  0
 UUID={root_uuid}  /tmp       btrfs  defaults,noatime,compress=zstd:3,subvol=@tmp  0  0
 UUID={root_uuid}  /.snapshots btrfs  defaults,noatime,compress=zstd:3,subvol=@snapshots  0  0
 tmpfs             /tmp       tmpfs  defaults,noatime,mode=1777  0  0

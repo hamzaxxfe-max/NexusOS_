@@ -34,9 +34,13 @@ require() {
     done
 }
 
+# Plasma 6 ships kwriteconfig6; Plasma 5 ships kwriteconfig5.
+# Resolve whichever is installed so the script works on both.
+KWRITE="$(command -v kwriteconfig6 || command -v kwriteconfig5)"
+
 kcw() {
     su -s /bin/bash "$SUDO_USER" -c \
-        "kwriteconfig5 --file '$1' --group '$2' --key '$3' '$4'" 2>/dev/null || true
+        "$KWRITE --file '$1' --group '$2' --key '$3' '$4'" 2>/dev/null || true
 }
 
 backup() {
@@ -66,7 +70,7 @@ do_restore() {
         kcw "kded5rc" "Module-${m}" "Enabled" "true"
     done
     rm -f /etc/sudoers.d/ram-cleaner
-    su -s /bin/bash "$SUDO_USER" -c "systemctl --user restart plasmashell" 2>/dev/null || true
+    su -s /bin/bash "$SUDO_USER" -c "systemctl --user restart plasma-plasmashell.service" 2>/dev/null || true
     log "Restored. Re-login recommended."
 }
 
@@ -308,7 +312,7 @@ minimal_desktop() {
 reload_plasma() {
     log "Reloading Plasma..."
     su -s /bin/bash "$SUDO_USER" -c \
-        "systemctl --user restart plasmashell" 2>/dev/null || \
+        "systemctl --user restart plasma-plasmashell.service" 2>/dev/null || \
     su -s /bin/bash "$SUDO_USER" -c \
         "qdbus org.kde.plasmashell /PlasmaShell reinitialize" 2>/dev/null || true
     su -s /bin/bash "$SUDO_USER" -c \
@@ -341,7 +345,7 @@ print_summary() {
 
 # ===========================================================================
 if $RESTORE; then
-    require kwriteconfig5
+    [[ -n "$KWRITE" ]] || die "Missing: kwriteconfig6/kwriteconfig5"
     UHOME="$(eval echo "~${SUDO_USER}")"
     UCONF="$UHOME/.config"
     USHARE="$UHOME/.local/share"
@@ -350,7 +354,7 @@ if $RESTORE; then
     exit 0
 fi
 
-require kwriteconfig5
+[[ -n "$KWRITE" ]] || die "Missing: kwriteconfig6/kwriteconfig5"
 log "=== strip-plasma.sh v${VERSION} ==="
 log "User: $SUDO_USER ($UHOME)"
 

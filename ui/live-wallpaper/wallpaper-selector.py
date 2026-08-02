@@ -70,11 +70,20 @@ def load_config():
 def save_current_wallpaper(path):
     config = load_config()
     config["current_wallpaper"] = path
+    content = json.dumps(config, indent=2)
     try:
         CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
         with open(CONFIG_PATH, "w") as f:
-            json.dump(config, f, indent=2)
-    except OSError:
+            f.write(content)
+        return
+    except (PermissionError, OSError):
+        pass
+    try:
+        subprocess.run(
+            ["sudo", "tee", str(CONFIG_PATH)],
+            input=content, capture_output=True, text=True, timeout=30,
+        )
+    except (subprocess.SubprocessError, FileNotFoundError, OSError):
         pass
 
 

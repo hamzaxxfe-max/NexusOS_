@@ -1,102 +1,128 @@
 name: Deploy Aion Website
 
 on:
-    push:
-        branches:
-            - main
-        paths:
-            - 'website/**'
-            - 'manifest.json'
-    workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'deploy/ota/manifest.json'
+      - '.github/workflows/pages-deploy.yml'
+  workflow_dispatch:
 
 permissions:
-    contents: read
-    pages: write
-    id-token: write
+  contents: read
+  pages: write
+  id-token: write
 
 concurrency:
-    group: pages
-    cancel-in-progress: false
+  group: pages
+  cancel-in-progress: false
 
 jobs:
-    build:
-        name: Build Website
-        runs-on: ubuntu-latest
-        timeout-minutes: 10
+  build:
+    name: Build Website
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v4
+      - name: Validate HTML
+        run: |
+          if [ -f docs/index.html ]; then
+            python -c "
+          import re, sys
+          with open('docs/index.html') as f:
+              html = f.read()
+          errors = []
+          if '<html' not in html.lower():
+              errors.append('Missing <html> tag')
+          if '<head' not in html.lower():
+              errors.append('Missing <head> tag')
+          if '<body' not in html.lower():
+              errors.append('Missing <body> tag')
+          if '<title' not in html.lower():
+              errors.append('Missing <title> tag')
+          if errors:
+              for e in errors:
+                  print(f'Error: {e}', file=sys.stderr)
+              sys.exit(1)
+          print('HTML validation passed.')
+          "
+          fi
 
-            - name: Setup Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: '20'
+      - name: Build static assets
+        run: |
+          if [ -f website/package.json ] && grep -q '"build"' website/package.json; then
+            cd website && npm ci && npm run build
+          fi
 
-            - name: Install dependencies
-              run: |
-                  if [ -f website/package.json ]; then
-                      cd website && npm ci
-                  fi
+      - name: Inject manifest data
+        run: |
+          if [ -f docs/index.html ] && [ -f deploy/ota/manifest.json ]; then
+            python -c "
+          import json
+          with open('deploy/ota/manifest.json') as f:
+              m = json.load(f)
+          with open('docs/index.html') as f:
+              html = f.read()
+          version = m.get('latest_version', '0.0.0')
+          html = html.replace('<!--MANIFEST_VERSION-->', version)
+          with open('docs/index.html', 'w') as f:
+              f.write(html)
+          print(f'Injected manifest version: {version}')
+          "
+          fi
 
-            - name: Build static assets
-              run: |
-                  if [ -f website/package.json ] && grep -q '"build"' website/package.json; then
-                      cd website && npm run build
-                  fi
+      - name: Prepare Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
 
-            - name: Process templates
-              run: |
-                  cp manifest.json website/manifest.json 2>/dev/null || true
+  deploy:
+    name: Deploy to Pages
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
 
-            - name: Minify HTML
-              run: |
-                  if command -v html-minifier &> /dev/null; then
-                      find website -name "*.html" -exec html-minifier \
-                          --collapse-whitespace \
-                          --remove-comments \
-                          --minify-css \
-                          --minify-js \
-                          -o {} {} \;
-                  fi
+  verify:
+    name: Verify Deployment
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Wait for propagation
+        run: sleep 30
 
-            - name: Prepare Pages artifact
-              uses: actions/upload-pages-artifact@v3
-              with:
-                  path: website
+      - name: Check site accessibility
+        run: |
+          SITE_URL="https://${{ github.repository_owner }}.github.io/aion/"
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$SITE_URL" || echo "000")
+          echo "HTTP status: $HTTP_STATUS"
 
-    deploy:
-        name: Deploy to Pages
-        needs: build
-        runs-on: ubuntu-latest
-        timeout-minutes: 10
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "### Site is live" >> "$GITHUB_STEP_SUMMARY"
+            echo "URL: $SITE_URL" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### Site returned HTTP $HTTP_STATUS" >> "$GITHUB_STEP_SUMMARY"
+            echo "May need more propagation time." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
-        environment:
-            name: github-pages
-            url: ${{ steps.deployment.outputs.page_url }}
+      - name: Verify manifest is accessible
+        run: |
+          MANIFEST_URL="https://raw.githubusercontent.com/${{ github.repository }}/main/deploy/ota/manifest.json"
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$MANIFEST_URL" || echo "000")
+          echo "Manifest HTTP status: $HTTP_STATUS"
 
-        steps:
-            - name: Deploy to GitHub Pages
-              id: deployment
-              uses: actions/deploy-pages@v4
-
-    verify:
-        name: Verify Deployment
-        needs: deploy
-        runs-on: ubuntu-latest
-        timeout-minutes: 5
-
-        steps:
-            - name: Wait for propagation
-              run: sleep 30
-
-            - name: Check site accessibility
-              run: |
-                  SITE_URL="https://${{ github.repository_owner }}.github.io/aion/"
-                  HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$SITE_URL" || echo "000")
-                  echo "HTTP status: $HTTP_STATUS"
-                  if [ "$HTTP_STATUS" = "200" ]; then
-                      echo "Site is live at $SITE_URL"
-                  else
-                      echo "Warning: Site returned HTTP $HTTP_STATUS. May need more propagation time."
-                  fi
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "Manifest is accessible."
+          else
+            echo "::warning::Manifest returned HTTP $HTTP_STATUS"
+          fi

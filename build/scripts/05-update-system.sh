@@ -159,8 +159,8 @@ echo "Disabling telemetry services..."
 systemctl disable --now packagekit 2>/dev/null || true
 systemctl mask packagekit.service
 
-# Disable KDE telemetry
-kwriteconfig5 --file kdeglobals --group KDE --key Statistics Enabled false 2>/dev/null || true
+# Disable KDE telemetry (Plasma 6 ships kwriteconfig6)
+kwriteconfig6 --file kdeglobals --group KDE --key Statistics Enabled false 2>/dev/null || true
 
 echo "Disabling unused services..."
 systemctl mask avahi-daemon.service 2>/dev/null || true

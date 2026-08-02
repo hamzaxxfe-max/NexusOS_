@@ -3,11 +3,11 @@ Description=Aion Security Bypass Daemon
 Documentation=https://aion.dev/docs/security-bypass
 After=graphical.target network.target
 Wants=graphical.target
-ConditionPathExists=/usr/lib/aion/daemon/security-bypass-daemon.py
+ConditionPathExists=/usr/lib/aion/security/security-bypass-daemon.py
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 /usr/lib/aion/daemon/security-bypass-daemon.py
+ExecStart=/usr/bin/python3 /usr/lib/aion/security/security-bypass-daemon.py
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
 RestartSec=5
