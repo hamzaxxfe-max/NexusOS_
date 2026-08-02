@@ -603,7 +603,7 @@ class TestDeployment(unittest.TestCase):
         src = _read("deploy/github/release-pipeline.yml")
         builder = _read("Aion-Builder.sh")
         self.assertIn("build-iso", src)
-        self.assertIn("container: archlinux", src)
+        self.assertIn("image: archlinux", src)
         self.assertIn("Aion-Builder.sh", src)
         self.assertIn("mkarchiso", builder, "Build should use archiso (mkarchiso)")
 

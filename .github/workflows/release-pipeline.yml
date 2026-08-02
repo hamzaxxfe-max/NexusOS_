@@ -203,7 +203,9 @@ jobs:
     name: Build ISO
     needs: [test, preflight]
     runs-on: ubuntu-latest
-    container: archlinux:base-devel
+    container:
+      image: archlinux:base-devel
+      options: --privileged
     if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')
     timeout-minutes: 120
     outputs:

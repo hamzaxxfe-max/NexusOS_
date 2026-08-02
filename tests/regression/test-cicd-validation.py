@@ -94,7 +94,7 @@ class TestCICDValidation(unittest.TestCase):
         builder = _read_file(BUILDER_SCRIPT)
         self.assertIsNotNone(builder, "Cannot read Aion-Builder.sh")
         self.assertIn(
-            "container: archlinux", pipeline,
+            "image: archlinux", pipeline,
             "Release pipeline build job must run in an archlinux container"
         )
         self.assertIn(
