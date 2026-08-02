@@ -26,7 +26,7 @@ jobs:
   ui-vision-test:
     name: Render & Inspect Aion UI
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -36,7 +36,7 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq \
             xvfb xdotool scrot imagemagick \
-            python3-pyqt6 python3-pip \
+            python3-pyqt6 python3-pip mpv \
             x11-utils wmctrl dbus-x11 fonts-noto-core
           python3 -m pip install --quiet --break-system-packages pytest pytest-qt 2>/dev/null || \
             python3 -m pip install --quiet --user pytest pytest-qt
@@ -60,6 +60,14 @@ jobs:
             exit 1
           fi
 
+      - name: Run UI vision agent (static + offscreen inspection)
+        run: |
+          sudo -E env QT_QPA_PLATFORM=offscreen \
+            python3 /workspace/repo/deploy/ui-test/ui-vision-agent.py \
+              /workspace/repo/ui --render --screenshots-dir /tmp/aion-ui || true
+        env:
+          QT_QPA_PLATFORM: offscreen
+
       - name: Upload screenshots & report
         if: always()
         uses: actions/upload-artifact@v4
@@ -68,5 +76,5 @@ jobs:
           path: |
             /tmp/aion-ui/*.png
             /tmp/aion-ui/*.log
-            /tmp/aion-ui/report.md
+            /tmp/aion-ui/*.md
           retention-days: 14

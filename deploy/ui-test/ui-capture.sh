@@ -51,6 +51,12 @@ run_app() { # run_app <label> <python-file>
     fi
     shoot "${label}-initial"
     log "  ${label} alive (pid ${pid}), waiting for interaction..."
+    # If no interactive vision agent is present (AUTO_DONE=1), create the
+    # .done marker ourselves after a short settle so captures don't block CI.
+    if [[ "${AUTO_DONE:-0}" == "1" ]]; then
+        sleep "${AUTO_DONE_SECS:-8}"
+        touch "${OUT_DIR}/${label}.done"
+    fi
     # Let the vision agent drive it; wait for the .done marker file.
     local waited=0
     while [[ ! -f "${OUT_DIR}/${label}.done" && "${waited}" -lt 60 ]]; do

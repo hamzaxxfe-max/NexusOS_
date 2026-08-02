@@ -35,6 +35,12 @@ stage() {
     install -m 0644 "${ROOT}/config/"*.json /etc/aion/ 2>/dev/null || true
     install -m 0644 "${ROOT}/ui/oobe/../live-wallpaper/live-wallpaper.json" /etc/aion/live-wallpaper.json 2>/dev/null || true
     install -m 0644 "${ROOT}/ui/game-capture/capture-config.json" /etc/aion/capture-config.json 2>/dev/null || true
+    # seed a sample wallpaper so the live-wallpaper engine has content to render
+    if command -v convert >/dev/null 2>&1; then
+        mkdir -p /usr/share/aion/live-wallpapers
+        convert -size 1280x720 gradient:navy-blue /usr/share/aion/live-wallpapers/aion-sample.png 2>/dev/null \
+            && log "seeded sample wallpaper" || log "WARN: could not seed sample wallpaper"
+    fi
 }
 
 start_xvfb() {
@@ -98,6 +104,8 @@ main() {
     export OUT_DIR="${OUT}"
     # Note: xdotool is used interactively by the vision agent after this point.
     chmod +x "${CAPTURE}"
+    export AUTO_DONE="${AUTO_DONE:-1}"
+    export AUTO_DONE_SECS="${AUTO_DONE_SECS:-8}"
     bash "${CAPTURE}" --display "${DISP}" --out "${OUT}" --app "${APP:-all}"
     gen_report
     if command -v xdpyinfo >/dev/null 2>&1; then xdpyinfo >/dev/null 2>&1; fi

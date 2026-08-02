@@ -34,6 +34,7 @@ from PyQt6.QtGui import (
     QPainter,
     QPainterPath,
     QPalette,
+    QPen,
     QPixmap,
 )
 from PyQt6.QtWidgets import (
@@ -48,6 +49,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QPlainTextEdit,
     QProgressBar,

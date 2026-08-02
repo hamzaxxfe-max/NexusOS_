@@ -152,7 +152,10 @@ def render_and_inspect(app_name, app_path, out_dir):
             win_cls = obj
             break
     if win_cls is None:
-        finding("HIGH", app_name, "no QMainWindow subclass found to render")
+        if app_name in ("wallpaper", "game-capture"):
+            finding("INFO", app_name, "daemon-style app (no QMainWindow); offscreen render skipped")
+        else:
+            finding("HIGH", app_name, "no QMainWindow subclass found to render")
         return
 
     try:

@@ -158,12 +158,13 @@ jobs:
 
       - name: Check immutable root integrity
         run: |
-          echo "Verifying core services don't write to /usr..."
+          echo "Verifying core services don't write to protected system paths..."
           VIOLATIONS=0
+          PROTECTED='(^|[\s"])(cp|mv|install|mkdir|rm|ln|tee|dd|chmod|chown)[\s]+[^#]*(/usr/|/opt/|/bin/|/sbin/|/lib/|/srv/)|(^|[^>">])[\s]*(>|>>)[\s]*["]?(/usr/|/opt/|/bin/|/sbin/|/lib/|/srv/)|(open|write|shutil\.(copy|move|rmtree)|os\.(mkdir|write|rename|symlink|remove|unlink))\([^)]*(/usr/|/opt/|/bin/|/sbin/|/lib/|/srv/)'
           for service in core/audio core/input-engine core/security core/network; do
             if [ -d "$service" ]; then
-              if grep -rn 'write\|cp\|mv\|install\|mkdir.*\/usr' "$service" --include="*.sh" --include="*.py" 2>/dev/null; then
-                echo "VIOLATION: $service attempts to modify /usr"
+              if grep -rnE "$PROTECTED" "$service" --include="*.sh" --include="*.py" 2>/dev/null; then
+                echo "VIOLATION: $service attempts to modify protected system path"
                 VIOLATIONS=$((VIOLATIONS + 1))
               fi
             fi

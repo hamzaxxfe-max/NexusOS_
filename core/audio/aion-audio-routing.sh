@@ -10,7 +10,7 @@ NC='\033[0m'
 
 LOG_FILE="/var/log/aion/audio-routing.log"
 WP_SCRIPT_DIR="/usr/share/wireplumber/scripts"
-WP_LUA_DIR="/usr/share/wireplumber/lua"
+WP_LUA_DIR="/etc/wireplumber/lua"
 
 GAMING_SINK="aion-gaming"
 CHAT_SINK="aion-chat"
