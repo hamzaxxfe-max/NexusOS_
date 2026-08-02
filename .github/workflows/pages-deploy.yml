@@ -2,7 +2,7 @@ name: Deploy Aion Website
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - 'docs/**'
       - 'deploy/ota/manifest.json'

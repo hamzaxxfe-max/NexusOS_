@@ -2,13 +2,13 @@ name: Aion Release Pipeline
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths-ignore:
       - '**.md'
       - 'docs/**'
       - 'website/**'
   pull_request:
-    branches: [main]
+    branches: [master]
   workflow_dispatch:
     inputs:
       force_build:
