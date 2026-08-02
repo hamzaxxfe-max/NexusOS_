@@ -406,10 +406,8 @@ generate_package_list() {
 base
 linux-zen
 linux-zen-headers
-firmware
 linux-firmware
 mkinitcpio
-mkinitcpio-btrfs
 grub
 grub-btrfs
 efibootmgr
@@ -443,7 +441,6 @@ xorg-xwayland
 wayland
 egl-wayland
 libva-mesa-driver
-mesa-vdpau
 
 # --- Audio ---
 pipewire
@@ -492,7 +489,6 @@ lxc
 # --- System Tools ---
 htop
 btop
-neofetch
 fastfetch
 tree
 unzip
@@ -508,7 +504,6 @@ micro
 gpgme
 nss
 p11-kit
-trousers
 
 # --- Development ---
 gcc
@@ -529,13 +524,11 @@ ttf-jetbrains-mono-nerd
 # --- Theming ---
 breeze-icons
 breeze-gtk
-xcursor-breeze
 kvantum
 
 # --- Input ---
 libinput
 xf86-input-libinput
-evdev
 xf86-input-evdev
 
 # --- Gaming ---
@@ -555,7 +548,6 @@ lib32-mesa
 inputplumber
 ananicy-cpp
 goverlay
-gamemode
 
 # --- Security Tools ---
 polkit
@@ -569,7 +561,6 @@ flatpak
 
 # --- Multimedia Codecs ---
 ffmpeg
-lib32-ffmpeg
 gstreamer
 gst-plugins-base
 gst-plugins-good
