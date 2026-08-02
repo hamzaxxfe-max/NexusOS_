@@ -1869,11 +1869,19 @@ generate_checksums() {
     log_step "Generating SHA256 checksums"
 
     cd "${OUT_DIR}"
-    sha256sum "${ISO_NAME}.iso" > "${checksum_file}"
+    : > "${checksum_file}"
+    if [[ -f "${ISO_NAME}.iso" ]]; then
+        sha256sum "${ISO_NAME}.iso" > "${checksum_file}"
+    fi
     if [[ -f "${ISO_NAME}.iso.xz" ]]; then
         sha256sum "${ISO_NAME}.iso.xz" >> "${checksum_file}"
     fi
     cd "${SCRIPT_DIR}"
+
+    if [[ ! -s "${checksum_file}" ]]; then
+        log_error "No artifacts found to checksum in ${OUT_DIR}"
+        exit 1
+    fi
 
     log_success "Checksums written: ${checksum_file}"
     cat "${checksum_file}"
@@ -1890,7 +1898,7 @@ compress_iso() {
         rm -f "${xz_path}"
     fi
 
-    xz -9 -T 0 "${iso_path}"
+    xz -9 -T 0 -k "${iso_path}"
     log_success "Compressed: ${xz_path}"
 
     local xz_size
