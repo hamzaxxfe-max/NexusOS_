@@ -36,7 +36,7 @@ WALLPAPER_PROCS = ["wallpaper-engine", "swww", "mpvpaper", "swaybg", "hyprpaper"
 GAME_PATTERNS = [
     "wine", "steam", "proton", "lutris", "gamescope", "mangohud",
     "gamemode", "dxvk", "vkd3d", "d3dadapter", "mono", "gecko",
-    "starfield", "cyberpunk", "elden", "baldurs", " Hogwarts",
+    "starfield", "cyberpunk", "elden", "baldurs", "hogwarts",
     "native", "heroic", "epicgames", "gog", "itch",
 ]
 DESKTOP_PATTERNS = [
