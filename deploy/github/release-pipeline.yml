@@ -235,7 +235,7 @@ jobs:
           elif [ "${{ github.ref_type }}" = "tag" ]; then
             VERSION="${GITHUB_REF#refs/tags/v}"
           else
-            SHORT_SHA=$(git rev-parse --short HEAD)
+            SHORT_SHA=${GITHUB_SHA:0:7}
             TIMESTAMP=$(date -u +"%Y%m%d%H%M")
             VERSION="0.0.0-dev.${TIMESTAMP}.g${SHORT_SHA}"
           fi
