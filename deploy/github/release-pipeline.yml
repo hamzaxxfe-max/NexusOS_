@@ -7,6 +7,9 @@ on:
       - '**.md'
       - 'docs/**'
       - 'website/**'
+      - 'deploy/ota/manifest.json'
+      - 'deploy/ota/manifest.json.sig'
+      - 'deploy/ota/aion-release.asc'
   pull_request:
     branches: [master]
   workflow_dispatch:
@@ -200,8 +203,9 @@ jobs:
     name: Build ISO
     needs: [test, preflight]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
-    timeout-minutes: 60
+    container: archlinux:base-devel
+    if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')
+    timeout-minutes: 120
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
@@ -237,35 +241,19 @@ jobs:
           echo "Aion $VERSION" >> "$GITHUB_STEP_SUMMARY"
           echo "\`\`\`" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Install build dependencies
+      - name: Refresh pacman databases
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq \
-            archiso \
-            dosfstools \
-            e2fsprogs \
-            libisoburn \
-            mtools \
-            squashfs-tools \
-            xz-utils \
-            zstd
-
-      - name: Cache pacman packages
-        uses: actions/cache@v4
-        with:
-          path: /var/cache/pacman/pkg
-          key: ${{ runner.os }}-pacman-${{ steps.version.outputs.version }}
-          restore-keys: |
-            ${{ runner.os }}-pacman-
+          pacman -Syy --noconfirm archlinux-keyring
+          pacman -Syy --noconfirm
 
       - name: Build ISO
         id: build
         run: |
           chmod +x Aion-Builder.sh
           chmod +x build/scripts/*.sh
-          sudo ./Aion-Builder.sh "${{ steps.version.outputs.version }}"
+          ./Aion-Builder.sh "${{ steps.version.outputs.version }}"
 
-          ISO_PATH="build/${ISO_NAME}-${{ steps.version.outputs.version }}.iso"
+          ISO_PATH="build/out/aion-${{ steps.version.outputs.version }}.iso"
           if [ ! -f "$ISO_PATH" ]; then
             echo "::error::ISO not found at $ISO_PATH"
             find build/ -name "*.iso" -ls 2>/dev/null
@@ -375,7 +363,7 @@ jobs:
           retention-days: 30
 
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main'
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
@@ -416,14 +404,14 @@ jobs:
   update-manifest:
     name: Update OTA Manifest
     needs: build-iso
-    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main'
+    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: master
           fetch-depth: 0
 
       - name: Fetch ISO checksum
@@ -512,13 +500,13 @@ jobs:
             echo "No manifest changes"
           else
             git commit -m "chore: update manifest for ${{ needs.build-iso.outputs.version }}"
-            git push origin main
+            git push origin master
           fi
 
   distribute:
     name: Distribute Release Artifacts
     needs: update-manifest
-    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main'
+    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

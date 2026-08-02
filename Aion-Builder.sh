@@ -200,6 +200,8 @@ install_deps_arch() {
         dosfstools \
         e2fsprogs \
         grub \
+        mtools \
+        libisoburn \
         xz \
         gzip \
         squashfs-tools \
@@ -337,21 +339,26 @@ generate_profiledef() {
     log_info "Generating profiledef.sh..."
 
     cat > "${PROFILE_DIR}/profiledef.sh" << PROFILEEOF
-# Aion archiso profile definition
+# Aion archiso profile definition (modern archiso format)
 iso_name="${ISO_NAME}"
-iso_label="${ISO_LABEL}"
+iso_label="${ISO_LABEL:0:16}"
 iso_publisher="Aion Technologies <info@aion.dev>"
 iso_application="Aion ${VERSION}"
 iso_version="${VERSION}"
 install_dir="aion"
 buildmodes=('iso')
-bootloader=('grub')
-bootargs=("quiet")
-bootwait="5"
-compors=("xz")
-compression=("xz")
-compression_options=("-9" "-T" "0")
-airootfs_image_tool_options=()
+bootmodes=('uefi-x64.grub.esp' 'uefi-x64.grub.eltorito')
+arch='x86_64'
+pacman_conf='pacman.conf'
+airootfs_image_type='squashfs'
+airootfs_image_tool_options=('-comp' 'xz' '-Xbcj' 'x86' '-b' '1M' '-Xdict-size' '1M')
+bootstrap_tarball_compression=('zstd' '-c' '-T0' '--auto-threads' '1')
+file_permissions=(
+  ["/etc/shadow"]="0:0:0400"
+  ["/etc/sudoers.d/aion"]="0:0:0440"
+  ["/root"]="0:0:0750"
+  ["/home/aion"]="0:0:0750"
+)
 PROFILEEOF
 
     log_success "profiledef.sh generated"
@@ -363,14 +370,9 @@ generate_pacman_conf() {
 
     cat > "${PROFILE_DIR}/pacman.conf" << 'PACMANEOF'
 [options]
-RootDir          = /root
-CacheDir         = /var/cache/pacman/pkg
-GPGDir           = /etc/pacman.d/gnupg
-LogFile          = /var/log/pacman.log
-HoldPkg          = pacman glibc
-Architecture     = x86_64
+Architecture = x86_64
 CheckSpace
-SigLevel         = Required DatabaseOptional
+SigLevel = Required DatabaseOptional
 LocalFileSigLevel = Optional
 ParallelDownloads = 5
 Color
