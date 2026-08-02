@@ -14,8 +14,8 @@ import tempfile
 import time
 from pathlib import Path
 
-from PyQt6.QtCore import QThread, QTimer, pyqtSignal
-from PyQt6.QtGui import QAction, QIcon
+from PyQt6.QtCore import QThread, QTimer, Qt, pyqtSignal
+from PyQt6.QtGui import QAction, QColor, QFont, QIcon, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import (
     QApplication,
     QMenu,
@@ -521,7 +521,7 @@ class LiveWallpaperDaemon:
     def _setup_tray(self, app):
         if not self._config.get("tray_icon", True):
             return
-        self._tray = QSystemTrayIcon()
+        self._tray = QSystemTrayIcon(self._tray_icon(), app)
         menu = QMenu()
         play_pause = QAction("Pause", app)
         play_pause.triggered.connect(self._toggle_pause)
@@ -548,6 +548,21 @@ class LiveWallpaperDaemon:
         self._tray.setContextMenu(menu)
         self._tray.setToolTip(APP_NAME)
         self._tray.show()
+
+    @staticmethod
+    def _tray_icon() -> QIcon:
+        pixmap = QPixmap(64, 64)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setBrush(QColor("#00D2FF"))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRoundedRect(4, 4, 56, 56, 12, 12)
+        painter.setPen(QPen(QColor("#000000"), 3))
+        painter.setFont(QFont("Arial", 28, QFont.Weight.Bold))
+        painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, "W")
+        painter.end()
+        return QIcon(pixmap)
 
     def _toggle_pause(self):
         if self._mpv.paused:
