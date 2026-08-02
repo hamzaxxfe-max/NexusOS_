@@ -30,7 +30,7 @@ log() { echo "[ui-capture] $*"; }
 shoot() { # shoot <name>
     # Give Qt a moment to paint the current frame.
     sleep 1.5
-    import -window root "${OUT_DIR}/${1}.png" 2>/dev/null \
+    timeout 15 import -window root "${OUT_DIR}/${1}.png" 2>/dev/null \
         && log "captured ${1}.png" \
         || log "WARN: failed to capture ${1}.png"
 }
@@ -65,6 +65,17 @@ run_app() { # run_app <label> <python-file>
     done
     shoot "${label}-final"
     kill "${pid}" 2>/dev/null || true
+    # Graceful shutdown with a hard ceiling — an app that ignores SIGTERM
+    # must not wedge the capture driver (CI timeout).
+    local grace=0
+    while [[ "${grace}" -lt 10 ]] && kill -0 "${pid}" 2>/dev/null; do
+        sleep 1
+        grace=$((grace + 1))
+    done
+    if kill -0 "${pid}" 2>/dev/null; then
+        log "  ${label} ignored SIGTERM — sending SIGKILL"
+        kill -9 "${pid}" 2>/dev/null || true
+    fi
     wait "${pid}" 2>/dev/null || true
     rm -f "${OUT_DIR}/${label}.done"
     log "finished ${label}"
