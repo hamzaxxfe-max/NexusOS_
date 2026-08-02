@@ -85,15 +85,20 @@ def scan_runtime(app_name, window):
     w = window.width()
     h = window.height()
 
+    seen = set()
+
     def walk(obj, depth=0):
         for child in obj.findChildren(QObject):
+            if id(child) in seen:
+                continue
+            seen.add(id(child))
             cname = child.__class__.__name__
             if isinstance(child, QLabel):
                 t = child.text()
                 if t.strip() == "" and child.objectName() and "bg" not in child.objectName().lower():
                     pass  # decorative labels are fine
-                elif len(t) > 120 and "\n" not in t:
-                    finding("LOW", app_name, f"very long single-line label ({len(t)} chars): {t[:48]}...")
+                elif not child.wordWrap() and len(t) > 120 and "\n" not in t:
+                    finding("LOW", app_name, f"very long non-wrapping label ({len(t)} chars): {t[:48]}...")
             elif isinstance(child, QPushButton):
                 if not child.isEnabled():
                     finding("MED", app_name, f"button disabled at load: \"{child.text()}\"")
@@ -114,7 +119,6 @@ def scan_runtime(app_name, window):
                 g = child.geometry()
                 if g.width() > 0 and (g.x() + g.width() > w + 4 or g.y() + g.height() > h + 4):
                     finding("MED", app_name, f"{cname} overflows window bounds", f"geo=({g.x()},{g.y()},{g.width()}x{g.height()}) win={w}x{h}")
-            walk(child, depth + 1)
 
     walk(window)
 
