@@ -8,6 +8,10 @@ source into a single, Windows-simple experience:
   * pacman / flatpak system packages
   * Aion-native tools and drivers
 
+Local library aggregation (see library-bridge.py):
+  GET  /api/library          — unified list of installed games
+  GET  /api/library/stats    — per-source counts and total size
+
 Endpoints (JSON):
   GET  /api/apps                — catalog from manifest + installed state
   GET  /api/apps/<id>           — single app detail
@@ -42,11 +46,28 @@ HUB_ROOT = Path(__file__).resolve().parent
 MANIFEST = HUB_ROOT / "manifest.json"
 WEB_DIR = HUB_ROOT / "web"
 INSTALL_LOG = HUB_ROOT / "installer" / "install-queue.json"
+LIBRARY_BRIDGE = HUB_ROOT / "library-bridge.py"
 PASSWORD_FILE = Path(os.environ.get(
     "AION_CONFIG_DIR", "/etc/aion")) / "hub-password.json"
 DEFAULT_PORT = 8931
 
 logger = logging.getLogger("aion-hub")
+
+
+def _load_library() -> Any:
+    """Lazily import the unified-store library bridge (stdlib only)."""
+    try:
+        from library_bridge import Library
+    except ImportError:
+        spec = importlib.util.spec_from_file_location(
+            "library_bridge", LIBRARY_BRIDGE)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module.Library
+    return Library
+
+
+LIBRARY_CLS = None
 
 # --- Rate limiting ---------------------------------------------------------
 # Budget per client for sensitive endpoints (auth brute force, install spam).
@@ -324,6 +345,14 @@ MIME = {
 class HubHandler(BaseHTTPRequestHandler):
     catalog: Catalog = Catalog()
     installer: Installer = Installer()
+    library: Any = None
+
+    @classmethod
+    def get_library(cls) -> Any:
+        """Shared lazily-initialized Library aggregator."""
+        if cls.library is None:
+            cls.library = _load_library()()
+        return cls.library
 
     def log_message(self, fmt: str, *args: Any) -> None:
         logger.info("%s %s", self.address_string(), fmt % args)
@@ -380,6 +409,17 @@ class HubHandler(BaseHTTPRequestHandler):
 
         if path == "/api/status":
             return self._send_json(self.installer.status())
+
+        if path == "/api/library/stats":
+            return self._send_json(self.get_library().stats())
+
+        if path == "/api/library":
+            query = urllib.parse.parse_qs(
+                urllib.parse.urlsplit(self.path).query).get("source", [""])[0]
+            games = self.get_library().all()
+            if query:
+                games = [g for g in games if g["source"] == query]
+            return self._send_json(games)
 
         if path.startswith("/api/apps/"):
             app_id = path[len("/api/apps/"):]

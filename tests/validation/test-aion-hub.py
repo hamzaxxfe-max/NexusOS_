@@ -253,5 +253,71 @@ def path_guard(handler_cls, path):
     return path.startswith("/api/")
 
 
+class TestLibraryBridge(unittest.TestCase):
+    """Unified store: Steam/Lutris/Heroic library aggregation."""
+
+    def setUp(self):
+        import tempfile
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        (self.root / "Steam/steamapps/common/Test Game").mkdir(parents=True)
+        (self.root / "Steam/steamapps/appmanifest_730.acf").write_text(
+            '"AppState"\n\t"appid"\t\t"730"\n\t"name"\t\t"Counter-Strike 2"\n',
+            encoding="utf-8")
+        (self.root / "lutris/games").mkdir(parents=True)
+        (self.root / "lutris/games/elden-ring.yml").write_text(
+            "name: Elden Ring\nslug: elden-ring\n", encoding="utf-8")
+        (self.root / "heroic/games_store").mkdir(parents=True)
+        (self.root / "heroic/games_store/settings.json").write_text(
+            json.dumps({"library": {"witcher3": {"title": "Witcher 3"}}}),
+            encoding="utf-8")
+
+        bridge = HUB / "library-bridge.py"
+        spec = importlib.util.spec_from_file_location("aion_library_bridge", bridge)
+        self.lib = importlib.util.module_from_spec(spec)
+        sys.modules["aion_library_bridge"] = self.lib
+        spec.loader.exec_module(self.lib)
+
+        self.lib.STEAM_BASE = self.root / "Steam"
+        self.lib.LUTRIS_GAMES = self.root / "lutris/games"
+        self.lib.HEROIC_SETTINGS = self.root / "heroic/games_store/settings.json"
+        self.lib.BOTTLES_DATA = self.root / "bottles"  # empty → skipped
+        self.lib.AION_GAMES = self.root / "aion"  # empty → skipped
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_aggregates_all_sources(self):
+        library = self.lib.Library()
+        games = library.all()
+        self.assertGreaterEqual(len(games), 3)
+        sources = {g["source"] for g in games}
+        self.assertIn("steam", sources)
+        self.assertIn("lutris", sources)
+        self.assertIn("heroic", sources)
+
+    def test_steam_entry_has_launch_uri(self):
+        games = self.lib.Library().all()
+        steam = [g for g in games if g["source"] == "steam"]
+        self.assertTrue(steam)
+        self.assertIn("steam://rungameid/730", steam[0]["launch"])
+
+    def test_stats_reports_totals(self):
+        stats = self.lib.Library().stats()
+        self.assertGreaterEqual(stats["total"], 3)
+        self.assertGreaterEqual(stats["perSource"]["steam"], 1)
+        self.assertEqual(len(stats["sources"]), 6)
+
+    def test_ids_are_unique_across_sources(self):
+        games = self.lib.Library().all()
+        ids = [g["id"] for g in games]
+        self.assertEqual(len(ids), len(set(ids)))
+
+    def test_broken_source_does_not_kill_library(self):
+        library = self.lib.Library(sources=["steam", "lutris", "heroic"])
+        games = library.all()
+        self.assertGreaterEqual(len(games), 3)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
