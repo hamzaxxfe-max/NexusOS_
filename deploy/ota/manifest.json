@@ -1,14 +1,14 @@
 {
-  "latest_version": "1.0.0",
-  "download_url": "https://github.com/hamzaxxfe-max/NexusOS_/releases/download/v1.0.0/aion-1.0.0.iso",
-  "sha256": "f4024e1fd899d5471c7586312dd088e3a005237c6ce2c52429914ce483e0365d",
-  "release_date": "2026-08-02T17:33:43Z",
+  "latest_version": "0.0.0-dev.202608031348.g1cdf9fa",
+  "download_url": "https://github.com/hamzaxxfe-max/NexusOS_/releases/download/v0.0.0-dev.202608031348.g1cdf9fa/aion-0.0.0-dev.202608031348.g1cdf9fa.iso",
+  "sha256": "261b379a522663c42fc30f2f49d902aa2373ab5d038bc85df9f2b5cd0f5586cc",
+  "release_date": "2026-08-03T14:28:44Z",
   "release_notes": "Aion 1.0.0 \u2014 First stable release. Immutable root filesystem, Btrfs snapshot-based atomic updates, OTA incremental patching, and desktop environment.",
   "manifest_signature_url": "https://raw.githubusercontent.com/username/aion/main/deploy/ota/manifest.json.sig",
-  "signature_url": "https://github.com/hamzaxxfe-max/NexusOS_/releases/download/v1.0.0/aion-1.0.0.iso.sig",
+  "signature_url": "https://github.com/hamzaxxfe-max/NexusOS_/releases/download/v0.0.0-dev.202608031348.g1cdf9fa/aion-0.0.0-dev.202608031348.g1cdf9fa.iso.sig",
   "full_release_notes": "Aion 1.0.0 Stable Release\n\nFeatures:\n- Immutable root filesystem with dm-verity\n- Btrfs snapshot-based atomic updates\n- OTA incremental patching (xdelta3 diffs)\n- Automatic rollback on boot failure\n- GRUB bootloader with snapshot selection\n- systemd-based service management\n- Desktop environment (Hyprland + Waybar)\n- Package management via pacman\n- Secure boot support\n\nBug Fixes:\n- Fixed snapshot cleanup not running on timer\n- Fixed network manager restart after rollback\n- Fixed bootloader entry ordering\n\nKnown Issues:\n- First boot may take longer while generating initramfs\n- Secure boot requires manual key enrollment on first install",
   "min_required_version": "0.9.0",
-  "size": 3370457088,
+  "size": 3411236864,
   "incremental_patches": [
     {
       "from_version": "0.9.0",
@@ -18,7 +18,7 @@
       "size": 340
     }
   ],
-  "zst_url": "https://github.com/hamzaxxfe-max/NexusOS_/releases/download/v1.0.0/aion-1.0.0.iso.zst",
-  "zst_sha256": "68ce53cdfce6d5bd92f99b904f25dac35e9c37c1cb46ccaa5606340103f7be3e",
-  "zst_size": 3340964752
+  "zst_url": "https://github.com/hamzaxxfe-max/NexusOS_/releases/download/v0.0.0-dev.202608031348.g1cdf9fa/aion-0.0.0-dev.202608031348.g1cdf9fa.iso.zst",
+  "zst_sha256": "7cf6c7c828e4f3d172df41da623c61b7cd3e03b308ed7be2dca7953d25f42339",
+  "zst_size": 3382318039
 }
