@@ -109,7 +109,7 @@ configure_grub() {
     log "Configuring GRUB bootloader..."
     cat > "$PROFILE_DIR/grub/grub.cfg" << 'GRUBCFG'
 set default=0
-set timeout=3
+set timeout=1
 
 serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1
 terminal_input serial console
@@ -119,36 +119,36 @@ set menu_color_normal=white/black
 set menu_color_highlight=black/light-gray
 
 menuentry "Aion (default)" {
-    linux /aion/boot/vmlinuz-linux root=LABEL=AION_ROOT rw rootflags=subvol=@ console=ttyS0,115200n8
+    linux /aion/boot/vmlinuz-linux root=LABEL=AION_ROOT rw rootflags=subvol=@ quiet splash nowatchdog loglevel=3 rd.loglevel=3 console=ttyS0,115200n8
     initrd /aion/boot/initramfs-linux.img
 }
 
 menuentry "Aion (fallback)" {
-    linux /aion/boot/vmlinuz-linux root=LABEL=AION_ROOT rw rootflags=subvol=@ console=ttyS0,115200n8
+    linux /aion/boot/vmlinuz-linux root=LABEL=AION_ROOT rw rootflags=subvol=@ quiet splash nowatchdog loglevel=3 rd.loglevel=3 console=ttyS0,115200n8
     initrd /aion/boot/initramfs-linux-fallback.img
 }
 
 menuentry "Aion (snapshot: previous)" {
-    linux /aion/boot/vmlinuz-linux root=LABEL=AION_ROOT rw rootflags=subvol=@-rollback console=ttyS0,115200n8
+    linux /aion/boot/vmlinuz-linux root=LABEL=AION_ROOT rw rootflags=subvol=@-rollback quiet splash nowatchdog loglevel=3 rd.loglevel=3 console=ttyS0,115200n8
     initrd /aion/boot/initramfs-linux.img
 }
 
 menuentry "Aion (live)" {
-    linux /aion/boot/vmlinuz-linux archisobasedir=aion archisolabel=AION_LIVE console=ttyS0,115200n8
+    linux /aion/boot/vmlinuz-linux archisobasedir=aion archisolabel=AION_LIVE quiet splash nowatchdog loglevel=3 rd.loglevel=3 console=ttyS0,115200n8
     initrd /aion/boot/initramfs-linux.img
 }
 GRUBCFG
 
     cat > "$PROFILE_DIR/grub/grub-standalone.cfg" << 'GRUBSTANDALONE'
 set default=0
-set timeout=3
+set timeout=1
 
 serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1
 terminal_input serial console
 terminal_output serial console
 
 menuentry "Aion" {
-    linux /aion/boot/vmlinuz-linux root=LABEL=AION_ROOT rw console=ttyS0,115200n8
+    linux /aion/boot/vmlinuz-linux root=LABEL=AION_ROOT rw quiet splash nowatchdog loglevel=3 rd.loglevel=3 console=ttyS0,115200n8
     initrd /aion/boot/initramfs-linux.img
 }
 GRUBSTANDALONE
@@ -175,7 +175,7 @@ LABEL aion
     MENU LABEL Aion (default)
     LINUX /boot/vmlinuz-linux
     INITRD /boot/initramfs-linux.img
-    APPEND root=LABEL=AION_ROOT rw rootflags=subvol=@ quiet splash
+    APPEND root=LABEL=AION_ROOT rw rootflags=subvol=@ quiet splash nowatchdog
 
 LABEL aion-fallback
     MENU LABEL Aion (fallback)
@@ -204,7 +204,7 @@ patch_boot_timeout() {
     for grub_cfg in "$PROFILE_DIR/grub/grub.cfg" "$PROFILE_DIR/grub/grub-standalone.cfg"; do
         if [ -f "$grub_cfg" ]; then
             if grep -q "^set timeout=" "$grub_cfg" 2>/dev/null; then
-                sed -i 's/^set timeout=[0-9]*/set timeout=3/' "$grub_cfg"
+                sed -i 's/^set timeout=[0-9]*/set timeout=1/' "$grub_cfg"
                 patched=$((patched + 1))
             fi
         fi

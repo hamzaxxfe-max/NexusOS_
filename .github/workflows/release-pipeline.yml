@@ -201,6 +201,33 @@ jobs:
 
           echo "Boot counter failsafe verified."
 
+  changes:
+    name: Change Detection (fast-path)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      system: ${{ steps.filter.outputs.system }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect system-affecting changes
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            system:
+              - '!docs/**'
+              - '!website/**'
+              - '!**/*.md'
+              - '!tests/**'
+              - '!deploy/ota/manifest.json'
+              - '!deploy/ota/manifest.json.sig'
+              - '!deploy/ota/aion-release.asc'
+              - '!knowledge/**'
+
   security-scan:
     name: Security Scan (bandit + shellcheck)
     runs-on: ubuntu-latest
@@ -264,12 +291,14 @@ jobs:
 
   build-iso:
     name: Build ISO
-    needs: [test, preflight]
+    needs: [test, preflight, changes]
     runs-on: ubuntu-latest
     container:
       image: archlinux:base-devel
       options: --privileged
-    if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')
+    if: |
+      (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
+      && (needs.changes.outputs.system == 'true' || github.event_name == 'workflow_dispatch' || github.ref_type == 'tag')
     timeout-minutes: 120
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -285,6 +314,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Cache pacman packages
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/pacman/pkg
+          key: pacman-${{ hashFiles('Aion-Builder.sh', 'build/scripts/*.sh') }}
+          restore-keys: |
+            pacman-
 
       - name: Refresh pacman databases
         run: |
@@ -501,7 +538,7 @@ jobs:
   update-manifest:
     name: Update OTA Manifest
     needs: build-iso
-    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/master'
+    if: needs.build-iso.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -597,7 +634,7 @@ jobs:
   distribute:
     name: Distribute Release Artifacts
     needs: update-manifest
-    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/master'
+    if: needs.update-manifest.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

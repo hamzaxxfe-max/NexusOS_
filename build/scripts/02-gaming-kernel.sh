@@ -129,7 +129,7 @@ NVIDIA_CONF
         ENTRY_NAME="${ENTRY_SUBVOL##*:}"
         ENTRY="/boot/loader/entries/${ENTRY_NAME}.conf"
         if [[ -f "$ENTRY" ]]; then
-            sed -i "s|options .*|options root=UUID=${ROOT_UUID} rootflags=subvol=${SUBVOL} rw mitigations=off nowatchdog tsc=reliable clocksource=tsc tsc=unstable nvidia-drm.modeset=1 nvidia-drm.fbdev=1 rd.udev.log_priority=3 vt.global_cursor_default=0 loglevel=3 splash systemd.unified_cgroup_hierarchy=1|" "$ENTRY"
+            sed -i "s|options .*|options root=UUID=${ROOT_UUID} rootflags=subvol=${SUBVOL} rw mitigations=off nowatchdog tsc=reliable clocksource=tsc tsc=unstable nvidia-drm.modeset=1 nvidia-drm.fbdev=1 rd.udev.log_priority=3 vt.global_cursor_default=0 quiet splash loglevel=3 rd.loglevel=3 systemd.unified_cgroup_hierarchy=1|" "$ENTRY"
         fi
     done
 

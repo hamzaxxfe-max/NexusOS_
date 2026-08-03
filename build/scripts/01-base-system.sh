@@ -304,12 +304,16 @@ MARK_GOOD
     # Initramfs with btrfs + plymouth boot splash
     sed -i 's/^MODULES=()/MODULES=(btrfs)/' /etc/mkinitcpio.conf
     sed -i 's/^BINARIES=()/BINARIES=(\/usr\/bin\/btrfs)/' /etc/mkinitcpio.conf
-    sed -i 's/^HOOKS=.*/HOOKS=(base udev plymouth autodetect modconf kms keyboard keymap consolefont block filesystems fsck)/' /etc/mkinitcpio.conf
+    sed -i 's/^HOOKS=.*/HOOKS=(base systemd plymouth autodetect modconf kms keyboard keymap block filesystems)/' /etc/mkinitcpio.conf
     mkinitcpio -P
 
     # Enable services
     systemctl enable NetworkManager.service
     systemctl enable systemd-boot-update.service
+
+    # Disable udev-settle: waits for every device to fully probe before boot
+    # proceeds. Disabling it removes ~1-2s of boot time on most hardware.
+    systemctl mask systemd-udev-settle.service
 
 CHROOT
 
@@ -324,7 +328,7 @@ title   Aion (Active Slot)
 version aion-active
 linux   /vmlinuz-linux
 initrd  /initramfs-linux.img
-options root=UUID=${ROOT_UUID} rootflags=subvol=${SUBVOL_ROOT} rw mitigations=off
+options root=UUID=${ROOT_UUID} rootflags=subvol=${SUBVOL_ROOT} rw mitigations=off nowatchdog loglevel=3 rd.loglevel=3
 ENTRY
 
 cat > /boot/loader/entries/aion-alt.conf <<'ENTRY2'
@@ -332,7 +336,7 @@ title   Aion (Alternate Slot)
 version aion-alt
 linux   /vmlinuz-linux
 initrd  /initramfs-linux.img
-options root=UUID=${ROOT_UUID} rootflags=subvol=${SUBVOL_ALT} rw mitigations=off
+options root=UUID=${ROOT_UUID} rootflags=subvol=${SUBVOL_ALT} rw mitigations=off nowatchdog loglevel=3 rd.loglevel=3
 ENTRY2
 ENTRIES
 

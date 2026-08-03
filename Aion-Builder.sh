@@ -374,7 +374,7 @@ Architecture = x86_64
 CheckSpace
 SigLevel = Required DatabaseOptional
 LocalFileSigLevel = Optional
-ParallelDownloads = 5
+ParallelDownloads = 15
 Color
 
 [core]
@@ -1299,6 +1299,16 @@ enable_systemd_services() {
         fi
     done
 
+    # Speed up boot: udev-settle waits for every device to fully probe
+    # before the boot proceeds. Masking it removes ~1-2s on most hardware.
+    mkdir -p "${AIROOTFS}/etc/systemd/system/systemd-udev-settle.service.d"
+    cat > "${AIROOTFS}/etc/systemd/system/systemd-udev-settle.service.d/disable.conf" << 'UDVSETTLE'
+[Unit]
+Description=Block systemd-udev-settle from stalling boot
+UDVSETTLE
+    ln -sf /dev/null "${AIROOTFS}/etc/systemd/system/systemd-udev-settle.service"
+    log_success "  Masked systemd-udev-settle.service for faster boot"
+
     # Create a placeholder for the Aion boot service
     cat > "${AIROOTFS}/etc/systemd/system/aion-boot-setup.service" << 'BOOTEOF'
 [Unit]
@@ -1582,10 +1592,10 @@ configure_grub() {
 
     cat > "${AIROOTFS}/etc/default/grub" << 'GRUBEOF'
 GRUB_DEFAULT=0
-GRUB_TIMEOUT=3
-GRUB_TIMEOUT_STYLE=menu
+GRUB_TIMEOUT=1
+GRUB_TIMEOUT_STYLE=countdown
 GRUB_DISTRIBUTOR="Aion"
-GRUB_CMDLINE_LINUX_DEFAULT="quiet splash nvidia-drm.modeset=1 mitigations=off"
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash nowatchdog loglevel=3 rd.loglevel=3 nvidia-drm.modeset=1 mitigations=off"
 GRUB_CMDLINE_LINUX=""
 GRUB_TERMINAL_INPUT="console"
 GRUB_TERMINAL_OUTPUT="console"
@@ -1600,7 +1610,7 @@ GRUBEOF
 
     cat > "${AIROOTFS}/boot/grub/grub.cfg" << GRUBCFG
 set default=0
-set timeout=3
+set timeout=1
 
 serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1
 terminal_input serial console
@@ -1611,13 +1621,13 @@ set menu_color_highlight=black/light-gray
 
 menuentry "Aion ${VERSION}" --class aion --class gnu-linux --class os {
     search --no-floppy --fs-uuid --set=root XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
-    linux /boot/vmlinuz-linux-zen root=UUID=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX rootflags=subvol=/@ rw quiet splash console=ttyS0,115200n8
+    linux /boot/vmlinuz-linux-zen root=UUID=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX rootflags=subvol=/@ rw quiet splash nowatchdog loglevel=3 rd.loglevel=3 console=ttyS0,115200n8
     initrd /boot/initramfs-linux-zen.img
 }
 
 menuentry "Aion ${VERSION} (Recovery)" --class aion --class gnu-linux --class os {
     search --no-floppy --fs-uuid --set=root XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
-    linux /boot/vmlinuz-linux-zen root=UUID=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX rootflags=subvol=/@ rw single console=ttyS0,115200n8
+    linux /boot/vmlinuz-linux-zen root=UUID=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX rootflags=subvol=/@ rw single nowatchdog loglevel=3 rd.loglevel=3 console=ttyS0,115200n8
     initrd /boot/initramfs-linux-zen.img
 }
 
@@ -1722,7 +1732,7 @@ LABEL aion
     MENU LABEL Aion (default)
     LINUX /boot/vmlinuz-linux
     INITRD /boot/initramfs-linux.img
-    APPEND root=LABEL=AION_ROOT rw rootflags=subvol=@ quiet splash
+    APPEND root=LABEL=AION_ROOT rw rootflags=subvol=@ quiet splash nowatchdog
 
 LABEL aion-fallback
     MENU LABEL Aion (fallback)
@@ -1754,7 +1764,7 @@ SYSLINUXCFG
 # Boot Timeout Safety Net — Patch All Timeout Values
 # =============================================================================
 
-# Final safety net: scan all boot config files and enforce timeout=3.
+# Final safety net: scan all boot config files and enforce timeout=1.
 # Catches any timeout value that slipped through manual edits.
 # Runs after all individual boot config functions complete.
 patch_boot_timeout() {
@@ -1766,7 +1776,7 @@ patch_boot_timeout() {
     local grub_default="${AIROOTFS}/etc/default/grub"
     if [[ -f "${grub_default}" ]]; then
         if grep -q "^GRUB_TIMEOUT=" "${grub_default}" 2>/dev/null; then
-            sed -i 's/^GRUB_TIMEOUT=[0-9]*/GRUB_TIMEOUT=3/' "${grub_default}"
+            sed -i 's/^GRUB_TIMEOUT=[0-9]*/GRUB_TIMEOUT=1/' "${grub_default}"
             log_success "Patched GRUB_TIMEOUT in ${grub_default}"
             patched=$((patched + 1))
         fi
@@ -1776,7 +1786,7 @@ patch_boot_timeout() {
     local grub_cfg="${AIROOTFS}/boot/grub/grub.cfg"
     if [[ -f "${grub_cfg}" ]]; then
         if grep -q "^set timeout=" "${grub_cfg}" 2>/dev/null; then
-            sed -i 's/^set timeout=[0-9]*/set timeout=3/' "${grub_cfg}"
+            sed -i 's/^set timeout=[0-9]*/set timeout=1/' "${grub_cfg}"
             log_success "Patched set timeout in ${grub_cfg}"
             patched=$((patched + 1))
         fi
@@ -1821,7 +1831,7 @@ configure_mkinitcpio() {
 MODULES=(btrfs amdgpu radeon i915 nvidia nvidia_modeset nvidia_uvm nvidia_drm)
 BINARIES=()
 FILES=()
-HOOKS=(base udev plymouth autodetect modconf kms keyboard keymap consolefont block filesystems fsck)
+HOOKS=(base systemd plymouth autodetect modconf kms keyboard keymap block filesystems)
 COMPRESSION="zstd"
 COMPRESSION_OPTIONS=(-9)
 MKINIEOF

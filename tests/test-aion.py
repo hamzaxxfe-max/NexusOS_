@@ -227,7 +227,7 @@ class TestPythonImports(unittest.TestCase):
     def test_plymouth_hook_in_mkinitcpio(self):
         iso_src = _read("Aion-Builder.sh")
         self.assertIn("plymouth", iso_src, "Aion-Builder.sh must install plymouth")
-        self.assertIn("HOOKS=(base udev plymouth", iso_src, "Aion-Builder HOOKS must include plymouth")
+        self.assertIn("HOOKS=(base systemd plymouth", iso_src, "Aion-Builder HOOKS must include systemd + plymouth")
         direct_src = _read("build/scripts/01-base-system.sh")
         self.assertIn("plymouth", direct_src, "01-base-system.sh must install plymouth")
         self.assertIn("plymouthd.conf", direct_src, "01-base-system.sh must set plymouthd.conf")
