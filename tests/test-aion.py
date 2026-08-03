@@ -215,6 +215,23 @@ class TestPythonImports(unittest.TestCase):
         src = _read("build/build.sh")
         self.assertIn("06-footprint-optimize.sh", src, "build.sh must run footprint phase")
 
+    def test_plymouth_theme_files(self):
+        theme = ROOT / "boot/plymouth/aion-neon"
+        self.assertTrue((theme / "aion-neon.plymouth").exists(), "theme descriptor missing")
+        self.assertTrue((theme / "aion-neon.script").exists(), "animation script missing")
+        self.assertTrue((theme / "glow.png").exists(), "glow asset missing")
+        desc = (theme / "aion-neon.plymouth").read_text(encoding="utf-8")
+        self.assertIn("ModuleName=script", desc)
+        self.assertIn("ImageDir=/usr/share/plymouth/themes/aion-neon", desc)
+
+    def test_plymouth_hook_in_mkinitcpio(self):
+        iso_src = _read("Aion-Builder.sh")
+        self.assertIn("plymouth", iso_src, "Aion-Builder.sh must install plymouth")
+        self.assertIn("HOOKS=(base udev plymouth", iso_src, "Aion-Builder HOOKS must include plymouth")
+        direct_src = _read("build/scripts/01-base-system.sh")
+        self.assertIn("plymouth", direct_src, "01-base-system.sh must install plymouth")
+        self.assertIn("plymouthd.conf", direct_src, "01-base-system.sh must set plymouthd.conf")
+
     def test_security_daemon_constants(self):
         src = _read("core/security/security-bypass-daemon.py")
         self.assertIn("LOG_DIR", src)
@@ -512,6 +529,28 @@ class TestPerformance(unittest.TestCase):
         self.assertIn("class HubHandler", src)
         self.assertIn("/api/apps", src)
         self.assertIn("/api/install/", src)
+
+    def test_hub_library_bridge_endpoints(self):
+        src = _read("hub/aion-hub-server.py")
+        self.assertIn("/api/library", src, "hub must expose the unified library")
+        self.assertIn("library-bridge.py", src)
+
+    def test_library_bridge_module(self):
+        src = _read("hub/library-bridge.py")
+        for source in ("steam", "lutris", "heroic", "bottles", "aion"):
+            self.assertIn(f"_scan_{source}", src, f"bridge missing {source} scanner")
+
+    def test_emulation_framework_module(self):
+        src = _read("games/emulation/aion-emu-framework.py")
+        for needle in ("setup", "launch", "pcsx_rearmed", "scph1001.bin",
+                       "buildbot.libretro.com"):
+            self.assertIn(needle, src, f"emulation framework missing: {needle}")
+
+    def test_emulation_deployed_in_builder(self):
+        src = _read("Aion-Builder.sh")
+        self.assertIn("games/emulation", src, "builder must deploy emulation module")
+        self.assertIn("retroarch", src, "builder must install retroarch")
+        self.assertIn("aion-emu", src, "builder must expose aion-emu launcher")
 
     def test_hub_manifest_valid(self):
         data = json.loads(_read("hub/manifest.json"))
