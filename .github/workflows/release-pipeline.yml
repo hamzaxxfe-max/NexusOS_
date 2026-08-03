@@ -1,4 +1,4 @@
-name: Aion Release Pipeline
+﻿name: Aion Release Pipeline
 
 on:
   push:
@@ -40,10 +40,10 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
@@ -92,7 +92,7 @@ jobs:
 
           if [ "$TEST_EXIT" -ne 0 ] && [ "${{ inputs.force_build }}" != "true" ]; then
             echo "Tests failed ($FAILED failures). Skipping ISO build."
-            echo "### ❌ Tests Failed" >> "$GITHUB_STEP_SUMMARY"
+            echo "### âŒ Tests Failed" >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
 
@@ -100,11 +100,11 @@ jobs:
             echo "::warning::Tests failed but force_build is enabled. Continuing."
           fi
 
-          echo "### ✅ Tests Passed" >> "$GITHUB_STEP_SUMMARY"
+          echo "### âœ… Tests Passed" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: test-results
           path: |
@@ -118,7 +118,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Validate JSON configs
         run: |
@@ -209,7 +209,7 @@ jobs:
       system: ${{ steps.filter.outputs.system }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 2
 
@@ -234,10 +234,10 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -275,12 +275,12 @@ jobs:
               echo "No shell scripts found."
             fi
           else
-            echo "shellcheck not available — skipping."
+            echo "shellcheck not available â€” skipping."
           fi
 
       - name: Upload scan reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: security-scan-reports
           path: |
@@ -311,12 +311,12 @@ jobs:
       signing_fpr: ${{ steps.sign.outputs.signing_fpr }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Cache pacman packages
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: /var/cache/pacman/pkg
           key: pacman-${{ hashFiles('Aion-Builder.sh', 'build/scripts/*.sh') }}
@@ -414,7 +414,7 @@ jobs:
           AION_GPG_PRIVATE_KEY: ${{ secrets.AION_GPG_PRIVATE_KEY }}
         run: |
           if [ -z "$AION_GPG_PRIVATE_KEY" ]; then
-            echo "::warning::AION_GPG_PRIVATE_KEY secret not set — generating ephemeral signing key"
+            echo "::warning::AION_GPG_PRIVATE_KEY secret not set â€” generating ephemeral signing key"
             printf '%%no-protection\nKey-Type: RSA\nKey-Length: 3072\nName-Real: Aion Release Signing Key\nName-Email: releases@aion.dev\nExpire-Date: 0\n%%commit\n' | gpg --batch --gen-key
           else
             echo "$AION_GPG_PRIVATE_KEY" | base64 -d | gpg --batch --import
@@ -435,7 +435,7 @@ jobs:
           echo "signing_fpr=$FPR" >> "$GITHUB_OUTPUT"
 
       - name: Upload signature artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: aion-${{ steps.version.outputs.version }}-signatures
           path: |
@@ -445,21 +445,21 @@ jobs:
           retention-days: 30
 
       - name: Upload ISO artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: aion-${{ steps.version.outputs.version }}-iso
           path: ${{ steps.build.outputs.iso_path }}
           retention-days: 30
 
       - name: Upload ZSTD artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: aion-${{ steps.version.outputs.version }}-iso-zst
           path: ${{ steps.compress.outputs.zst_path }}
           retention-days: 30
 
       - name: Upload checksum artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: aion-${{ steps.version.outputs.version }}-checksums
           path: build/SHA256SUMS
@@ -505,8 +505,8 @@ jobs:
             ## Aion ${{ steps.version.outputs.version }}
 
             ### Downloads
-            - **ISO chunks**: \`aion-${{ steps.version.outputs.version }}.iso.*\` — split at 1.9GB to fit GitHub's 2GB asset limit
-            - **ZSTD chunks**: \`aion-${{ steps.version.outputs.version }}.iso.zst.*\` — smaller OTA payload
+            - **ISO chunks**: \`aion-${{ steps.version.outputs.version }}.iso.*\` â€” split at 1.9GB to fit GitHub's 2GB asset limit
+            - **ZSTD chunks**: \`aion-${{ steps.version.outputs.version }}.iso.zst.*\` â€” smaller OTA payload
             - **SHA256**: \`SHA256SUMS\`, \`SHA256SUMS.parts\` (per-chunk)
             - **GPG signatures**: \`*.iso.sig\`, \`*.iso.zst.sig\` (verify with \`gpg --verify\`)
 
@@ -543,13 +543,13 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: master
           fetch-depth: 0
 
       - name: Fetch ISO checksum
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: aion-${{ needs.build-iso.outputs.version || '' }}-checksums
           path: /tmp/checksums
@@ -565,9 +565,9 @@ jobs:
             cp /tmp/pubkey/aion-release.asc deploy/ota/aion-release.asc
             echo "Downloaded release public key to deploy/ota/aion-release.asc"
           elif [ -n "${{ needs.build-iso.outputs.signing_fpr }}" ]; then
-            echo "::warning::Public key not attached to release — signing_fpr present but key unavailable"
+            echo "::warning::Public key not attached to release â€” signing_fpr present but key unavailable"
           else
-            echo "::warning::No signing fingerprint — skipping public key export"
+            echo "::warning::No signing fingerprint â€” skipping public key export"
           fi
 
       - name: Update manifest.json
@@ -583,7 +583,7 @@ jobs:
           ZST_SIZE="${{ needs.build-iso.outputs.zst_size }}"
 
           if [ -z "$VERSION" ]; then
-            echo "::error::build-iso.outputs.version is empty — aborting manifest update"
+            echo "::error::build-iso.outputs.version is empty â€” aborting manifest update"
             exit 1
           fi
 
@@ -605,7 +605,7 @@ jobs:
           if [ -n "$AION_GPG_PRIVATE_KEY" ]; then
             echo "$AION_GPG_PRIVATE_KEY" | base64 -d | gpg --batch --import
           else
-            echo "::warning::AION_GPG_PRIVATE_KEY secret not set — manifest will be unsigned"
+            echo "::warning::AION_GPG_PRIVATE_KEY secret not set â€” manifest will be unsigned"
           fi
 
       - name: Commit manifest update
@@ -618,7 +618,7 @@ jobs:
               -o deploy/ota/manifest.json.sig deploy/ota/manifest.json 2>/dev/null; then
               echo "Manifest signed"
             else
-              echo "::warning::Manifest signing failed (no key) — continuing unsigned"
+              echo "::warning::Manifest signing failed (no key) â€” continuing unsigned"
             fi
           fi
           git add deploy/ota/manifest.json
@@ -639,26 +639,26 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Download ISO artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: aion-${{ needs.update-manifest.outputs.version || needs.build-iso.outputs.version || '' }}-iso
           path: /tmp/distribute
         continue-on-error: true
 
       - name: Download ZSTD artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: aion-${{ needs.update-manifest.outputs.version || needs.build-iso.outputs.version || '' }}-iso-zst
           path: /tmp/distribute
         continue-on-error: true
 
       - name: Download checksum artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: aion-${{ needs.update-manifest.outputs.version || needs.build-iso.outputs.version || '' }}-checksums
           path: /tmp/distribute
@@ -670,18 +670,18 @@ jobs:
           if ls /tmp/distribute/*.iso /tmp/distribute/*.iso.zst 2>/dev/null; then
             echo "Artifacts present for distribution."
           else
-            echo "::warning::No ISO/ZSTD artifacts found — release artifacts are hosted on GitHub Releases; skipping mirror publish."
+            echo "::warning::No ISO/ZSTD artifacts found â€” release artifacts are hosted on GitHub Releases; skipping mirror publish."
           fi
 
       - name: Publish OTA manifest to distribution channel
         run: |
           echo "Publishing OTA manifest (${GITHUB_REPOSITORY} @ ${{ github.ref_name }})..."
           if [ ! -f deploy/ota/manifest.json ]; then
-            echo "::warning::deploy/ota/manifest.json missing — nothing to publish"
+            echo "::warning::deploy/ota/manifest.json missing â€” nothing to publish"
             exit 0
           fi
           python3 -m json.tool deploy/ota/manifest.json > /dev/null && \
-            echo "Manifest is valid JSON — ready for OTA distribution."
+            echo "Manifest is valid JSON â€” ready for OTA distribution."
           echo "### Distribution Summary" >> "$GITHUB_STEP_SUMMARY"
           echo "- OTA manifest: \`deploy/ota/manifest.json\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- Channel: \`${{ github.ref_name }}\`" >> "$GITHUB_STEP_SUMMARY"

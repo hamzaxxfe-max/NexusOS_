@@ -656,7 +656,7 @@ class TestDeployment(unittest.TestCase):
 
     def test_release_pipeline_uses_checkout(self):
         src = _read("deploy/github/release-pipeline.yml")
-        self.assertIn("actions/checkout@v4", src)
+        self.assertIn("actions/checkout@v5", src)
 
     def test_release_pipeline_uses_gh_release(self):
         src = _read("deploy/github/release-pipeline.yml")
