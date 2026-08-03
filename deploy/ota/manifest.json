@@ -1,14 +1,14 @@
 {
-  "latest_version": "0.0.0-dev.202608031540.g2e25ab9",
-  "download_url": "https://github.com/hamzaxxfe-max/Aeon/releases/download/v0.0.0-dev.202608031540.g2e25ab9/aion-0.0.0-dev.202608031540.g2e25ab9.iso",
-  "sha256": "bfc4c912f9d6c69cd75ec9ba181ad3ad70e0a96c92e0300caef91c730533f176",
-  "release_date": "2026-08-03T16:16:34Z",
+  "latest_version": "0.0.0-dev.202608031543.g41ad984",
+  "download_url": "https://github.com/hamzaxxfe-max/Aeon/releases/download/v0.0.0-dev.202608031543.g41ad984/aion-0.0.0-dev.202608031543.g41ad984.iso",
+  "sha256": "0145b29d725ca81b2a227bb596953fa52f1cfeec3b3bb37e3d407429b7e8db9f",
+  "release_date": "2026-08-03T16:25:22Z",
   "release_notes": "Aion 1.0.0 \u2014 First stable release. Immutable root filesystem, Btrfs snapshot-based atomic updates, OTA incremental patching, and desktop environment.",
   "manifest_signature_url": "https://raw.githubusercontent.com/hamzaxxfe-max/Aeon/master/deploy/ota/manifest.json.sig",
-  "signature_url": "https://github.com/hamzaxxfe-max/Aeon/releases/download/v0.0.0-dev.202608031540.g2e25ab9/aion-0.0.0-dev.202608031540.g2e25ab9.iso.sig",
+  "signature_url": "https://github.com/hamzaxxfe-max/Aeon/releases/download/v0.0.0-dev.202608031543.g41ad984/aion-0.0.0-dev.202608031543.g41ad984.iso.sig",
   "full_release_notes": "Aion 1.0.0 Stable Release\n\nFeatures:\n- Immutable root filesystem with dm-verity\n- Btrfs snapshot-based atomic updates\n- OTA incremental patching (xdelta3 diffs)\n- Automatic rollback on boot failure\n- GRUB bootloader with snapshot selection\n- systemd-based service management\n- Desktop environment (Hyprland + Waybar)\n- Package management via pacman\n- Secure boot support\n\nBug Fixes:\n- Fixed snapshot cleanup not running on timer\n- Fixed network manager restart after rollback\n- Fixed bootloader entry ordering\n\nKnown Issues:\n- First boot may take longer while generating initramfs\n- Secure boot requires manual key enrollment on first install",
   "min_required_version": "0.9.0",
-  "size": 3413743616,
+  "size": 3413747712,
   "incremental_patches": [
     {
       "from_version": "0.9.0",
@@ -18,7 +18,7 @@
       "size": 340
     }
   ],
-  "zst_url": "https://github.com/hamzaxxfe-max/Aeon/releases/download/v0.0.0-dev.202608031540.g2e25ab9/aion-0.0.0-dev.202608031540.g2e25ab9.iso.zst",
-  "zst_sha256": "6f796f6708b5fc3d4b48a5b1f78a9e6682449741b9f91aee9ddbd305899ab03f",
-  "zst_size": 3384818612
+  "zst_url": "https://github.com/hamzaxxfe-max/Aeon/releases/download/v0.0.0-dev.202608031543.g41ad984/aion-0.0.0-dev.202608031543.g41ad984.iso.zst",
+  "zst_sha256": "bd5c7b7636eae9584b928f503a89288ddedfba083ba6407e63a707e303d63e33",
+  "zst_size": 3384706670
 }
