@@ -261,6 +261,7 @@ def restore_from_cloud(config: dict) -> bool:
 
     logger.info("Starting cloud restore from %s", remote_path)
     restored = 0
+    errors = 0
 
     for save_key, save_info in SYNC_PATHS.items():
         if save_key not in config.get("sync_paths", []):
@@ -286,10 +287,11 @@ def restore_from_cloud(config: dict) -> bool:
             restored += 1
             logger.info("Restored: %s", save_key)
         else:
+            errors += 1
             logger.error("Failed to restore %s: %s", save_key, result.stderr)
 
-    logger.info("Restore complete: %d restored", restored)
-    return True
+    logger.info("Restore complete: %d restored, %d errors", restored, errors)
+    return errors == 0
 
 
 def list_syncable():

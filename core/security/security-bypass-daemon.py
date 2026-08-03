@@ -18,7 +18,16 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QObject
 from PyQt6.QtGui import QFont, QColor, QPalette, QIcon, QPixmap, QPainter
-import inotify_simple
+try:
+    import inotify_simple  # type: ignore
+except ImportError:
+    # python-inotify_simple is AUR-only; use the bundled stdlib fallback so
+    # the daemon still works on a base install.
+    import os as _os
+    import sys as _sys
+
+    _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+    import inotify_simple_fallback as inotify_simple  # type: ignore
 
 LOG_DIR = Path("/var/log/aion")
 LOG_FILE = LOG_DIR / "security-bypass.log"
@@ -315,10 +324,33 @@ class WarningDialog(QDialog):
 
 
 class SandboxManager:
+    # The daemon runs as root; games must run as the unprivileged 'aion'
+    # user, not as root, or a sandboxed game is an instant root shell.
+    GAME_USER = "aion"
+    FALLBACK_UID = 1000
+    FALLBACK_GID = 1000
+    # Group IDs mirror /etc/group written by Aion-Builder.sh (video, audio,
+    # input, storage, network, power) — required for GPU/audio/input access.
+    SUPPLEMENTARY_GROUPS = [91, 92, 94, 95, 96, 97]
+
+    @staticmethod
+    def _game_uid_gid() -> tuple:
+        try:
+            import pwd
+            try:
+                pw = pwd.getpwnam(SandboxManager.GAME_USER)
+                return pw.pw_uid, pw.pw_gid
+            except KeyError:
+                return SandboxManager.FALLBACK_UID, SandboxManager.FALLBACK_GID
+        except ImportError:
+            return SandboxManager.FALLBACK_UID, SandboxManager.FALLBACK_GID
+
     @staticmethod
     def create_sandbox_command(executable_path: str, args: List[str]) -> List[str]:
         game_dir = str(Path(executable_path).parent)
-        uid = os.getuid()
+        uid, gid = SandboxManager._game_uid_gid()
+        home = "/home/{}".format(SandboxManager.GAME_USER)
+        runtime_dir = "/run/user/{}".format(uid)
         bwrap_cmd = [
             "bwrap",
             "--ro-bind", "/usr", "/usr",
@@ -337,16 +369,30 @@ class SandboxManager:
             "--bind", "/dev/snd", "/dev/snd",
             "--bind", "/dev/input", "/dev/input",
             "--bind", "/dev/wayland-0", "/dev/wayland-0",
-            "--ro-bind", "/run/user/{}/wayland-0".format(uid), "/run/user/{}/wayland-0".format(uid),
+            "--ro-bind", "{}/wayland-0".format(runtime_dir), "{}/wayland-0".format(runtime_dir),
             "--tmpfs", "/tmp",
             "--bind", game_dir, game_dir,
-            "--bind", "/home", "/home",
-            "--setenv", "HOME", "/home",
+            # Bind ONLY the game user's home read-write (saves/configs).
+            # Never bind the whole /home: the sandboxed process is not root
+            # anymore, so it must not reach other users' data.
+            "--bind", home, home,
+            "--ro-bind", "{}/.local/share".format(home), "{}/.local/share".format(home),
+            "--ro-bind", "{}/.config".format(home), "{}/.config".format(home),
+            # Drop privileges to the game user inside the namespace.
+            "--unshare-user",
+            "--uid", str(uid),
+            "--gid", str(gid),
+            "--groups", ",".join(str(g) for g in SandboxManager.SUPPLEMENTARY_GROUPS),
+            "--chdir", home,
+            "--setenv", "HOME", home,
+            "--setenv", "USER", SandboxManager.GAME_USER,
+            "--setenv", "LOGNAME", SandboxManager.GAME_USER,
             "--setenv", "DISPLAY", os.environ.get("DISPLAY", ":0"),
             "--setenv", "WAYLAND_DISPLAY", os.environ.get("WAYLAND_DISPLAY", "wayland-0"),
-            "--setenv", "XDG_RUNTIME_DIR", os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{uid}"),
-            "--setenv", "XDG_DATA_HOME", os.path.expanduser("~/.local/share"),
-            "--setenv", "XDG_CONFIG_HOME", os.path.expanduser("~/.config"),
+            "--setenv", "XDG_RUNTIME_DIR", runtime_dir,
+            "--setenv", "XDG_DATA_HOME", "{}/.local/share".format(home),
+            "--setenv", "XDG_CONFIG_HOME", "{}/.config".format(home),
+            "--setenv", "XDG_CACHE_HOME", "{}/.cache".format(home),
             "--die-with-parent",
             "--unshare-pid",
             "--unshare-net",
