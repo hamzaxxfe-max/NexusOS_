@@ -288,7 +288,7 @@ configure_aion() {
         "rollback_subvol": "@-rollback"
     },
     "ota": {
-        "manifest_url": "https://raw.githubusercontent.com/username/aion/main/manifest.json",
+        "manifest_url": "https://raw.githubusercontent.com/hamzaxxfe-max/Aeon/master/deploy/ota/manifest.json",
         "check_interval": 21600,
         "auto_apply": false
     }

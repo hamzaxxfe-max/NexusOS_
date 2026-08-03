@@ -83,7 +83,7 @@
     "auto_install_apk": true
   },
   "ota": {
-    "manifest_url": "https://raw.githubusercontent.com/username/aion/main/manifest.json",
+    "manifest_url": "https://raw.githubusercontent.com/hamzaxxfe-max/Aeon/master/deploy/ota/manifest.json",
     "check_interval_hours": 6,
     "auto_update_enabled": false,
     "notify_on_update": true,

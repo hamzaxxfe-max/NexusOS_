@@ -52,6 +52,14 @@ def shellcheck_table(path: str) -> int:
     return total
 
 
+def _repo_from_url(url: str) -> str:
+    """Extract 'owner/repo' from a GitHub URL, or '' if not a GitHub URL."""
+    import re
+
+    m = re.search(r"github\.com/([^/]+/[^/]+)/", url)
+    return m.group(1) if m else ""
+
+
 def update_manifest(args) -> None:
     path = "deploy/ota/manifest.json"
     with open(path) as f:
@@ -65,6 +73,28 @@ def update_manifest(args) -> None:
     manifest["zst_sha256"] = args[6]
     manifest["zst_size"] = int(args[7]) if args[7].isdigit() else 0
     manifest["signature_url"] = args[8]
+
+    repo = _repo_from_url(args[1])
+    if repo:
+        branch = args[3][: args[3].find("T")] if "T" in args[3] else ""
+        old = manifest.get("manifest_signature_url", "")
+        if "username/aion" in old or not old:
+            manifest["manifest_signature_url"] = (
+                "https://raw.githubusercontent.com/{repo}/master/deploy/ota/manifest.json.sig".format(repo=repo)
+            )
+        for patch in manifest.get("incremental_patches", []):
+            patch_url = patch.get("patch_url", "")
+            if "username/aion" in patch_url or not patch_url:
+                tag = patch.get("to_version", "")
+                patch["patch_url"] = (
+                    "https://github.com/{repo}/releases/download/v{tag}/patch-{frm}-to-{to}.xdelta".format(
+                        repo=repo,
+                        tag=tag,
+                        frm=patch.get("from_version", ""),
+                        to=tag,
+                    )
+                )
+
     with open(path, "w") as f:
         json.dump(manifest, f, indent=2)
         f.write("\n")

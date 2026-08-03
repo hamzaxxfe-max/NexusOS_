@@ -371,6 +371,23 @@ class TestCICDValidation(unittest.TestCase):
                 f"Workflow {wf.name} does not declare explicit permissions"
             )
 
+    def test_ota_manifest_no_placeholder_urls(self):
+        content = _read_file(MANIFEST_FILE)
+        if content is None:
+            self.skipTest("manifest.json not found")
+        data = json.loads(content)
+        bad_patterns = ["username/aion", "example.com", "<owner>", "<repo>"]
+        blob = json.dumps(data)
+        for pat in bad_patterns:
+            self.assertNotIn(
+                pat, blob,
+                "OTA manifest contains placeholder URL fragment: {}".format(pat)
+            )
+        self.assertIn(
+            "github.com", data.get("download_url", ""),
+            "OTA manifest download_url must point at GitHub releases"
+        )
+
     def test_ota_service_wants_dependency(self):
         service_path = _find_file("aion-ota.service")
         if service_path is None:

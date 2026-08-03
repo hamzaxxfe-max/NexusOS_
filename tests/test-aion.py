@@ -685,7 +685,12 @@ class TestDeployment(unittest.TestCase):
 
     def test_ota_manifest_version_format(self):
         m = json.loads(_read("deploy/ota/manifest.json"))
-        self.assertRegex(m["latest_version"], r"^\d+\.\d+\.\d+$")
+        # Accept either a stable X.Y.Z or a CI-generated dev build id
+        # like 0.0.0-dev.202608031443.g451748e.
+        self.assertRegex(
+            m["latest_version"],
+            r"^\d+\.\d+\.\d+(-\d+\.\d+\.\d+)?(-dev\.\d{12}\.g[0-9a-f]+)?$",
+        )
 
     def test_manifest_download_url_https(self):
         m = json.loads(_read("deploy/ota/manifest.json"))
