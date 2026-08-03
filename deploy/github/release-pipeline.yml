@@ -231,18 +231,7 @@ jobs:
             -f json || true
           echo "### Bandit Findings" >> "$GITHUB_STEP_SUMMARY"
           if [ -f bandit-report.json ]; then
-            python3 -c "
-            import json
-            with open('bandit-report.json') as f:
-                data = json.load(f)
-            issues = data.get('results', [])
-            print('| Severity | Confidence | Location | Issue |')
-            print('|----------|------------|----------|-------|')
-            for i in issues:
-                print(f\"| {i['issue_severity']} | {i['issue_confidence']} | {i['filename']}:{i['line_number']} | {i['test_name']} |\")
-            print()
-            print(f'Total findings: {len(issues)}')
-            "
+            python3 deploy/github/scan-report.py bandit bandit-report.json || true
           else
             echo "No bandit report generated."
           fi
@@ -254,19 +243,7 @@ jobs:
             SCRIPTS=$(find build core deploy features -name '*.sh' -o -name '*.bash' 2>/dev/null | sort || true)
             if [ -n "$SCRIPTS" ]; then
               shellcheck --format=json $SCRIPTS > shellcheck-report.json || true
-              python3 -c "
-              import json
-              with open('shellcheck-report.json') as f:
-                  data = json.load(f)
-              print('| Severity | File:Line | Code |')
-              print('|----------|-----------|------|')
-              for f in data:
-                  for c in f.get('comments', []):
-                      print(f\"| {c.get('level','')} | {f.get('file','')}:{c.get('line','')} | {c.get('code','')} |\")
-              print()
-              total = sum(len(f.get('comments', [])) for f in data)
-              print(f'Total shellcheck findings: {total}')
-              "
+              python3 deploy/github/scan-report.py shellcheck shellcheck-report.json || true
             else
               echo "No shell scripts found."
             fi
@@ -581,22 +558,8 @@ jobs:
             echo '{"latest_version":"","download_url":"","sha256":"","release_date":"","size":0}' > deploy/ota/manifest.json
           fi
 
-          python3 -c "
-          import json, sys
-          with open('deploy/ota/manifest.json','r') as f: m=json.load(f)
-          old=m.get('latest_version','')
-          m['latest_version']=sys.argv[1]
-          m['download_url']=sys.argv[2]
-          m['sha256']=sys.argv[3]
-          m['release_date']=sys.argv[4]
-          m['size']=int(sys.argv[5]) if sys.argv[5].isdigit() else m.get('size',0)
-          m['zst_url']=sys.argv[6]
-          m['zst_sha256']=sys.argv[7]
-          m['zst_size']=int(sys.argv[8]) if sys.argv[8].isdigit() else 0
-          m['signature_url']=sys.argv[9]
-          with open('deploy/ota/manifest.json','w') as f: json.dump(m,f,indent=2); f.write('\n')
-          print('Manifest updated: '+sys.argv[1])
-          " "$VERSION" "$DOWNLOAD_URL" "$SHA256" "$RELEASE_DATE" "${{ needs.build-iso.outputs.iso_size }}" "$ZST_URL" "$ZST_SHA" "$ZST_SIZE" "${DOWNLOAD_URL}.sig"
+          python3 deploy/github/scan-report.py manifest \
+            "$VERSION" "$DOWNLOAD_URL" "$SHA256" "$RELEASE_DATE" "${{ needs.build-iso.outputs.iso_size }}" "$ZST_URL" "$ZST_SHA" "$ZST_SIZE" "${DOWNLOAD_URL}.sig"
 
       - name: Import GPG signing key (update-manifest)
         env:
