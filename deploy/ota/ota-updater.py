@@ -27,7 +27,7 @@ except ImportError:
 
 CONFIG_PATH = Path("/etc/aion/aion-config.json")
 CONFIG_PATH_LEGACY = Path("/etc/aion/config.json")
-MANIFEST_URL = "https://raw.githubusercontent.com/username/aion/main/manifest.json"
+MANIFEST_URL = "https://raw.githubusercontent.com/hamzaxxfe-max/NexusOS_/master/deploy/ota/manifest.json"
 MANIFEST_CACHE = Path("/var/cache/aion/manifest.json")
 LOG_DIR = Path("/var/log/aion")
 LOG_FILE = LOG_DIR / "ota-updater.log"
