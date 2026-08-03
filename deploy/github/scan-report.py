@@ -101,9 +101,39 @@ def update_manifest(args) -> None:
     print("Manifest updated: {}".format(args[0]))
 
 
+def check_html(path: str) -> int:
+    """Validate docs/index.html has required structural tags."""
+    with open(path, encoding="utf-8") as f:
+        html = f.read().lower()
+    errors = []
+    for tag in ("<html", "<head", "<body", "<title"):
+        if tag not in html:
+            errors.append("Missing {} tag".format(tag))
+    if errors:
+        for e in errors:
+            print("Error: {}".format(e))
+        return 1
+    print("HTML validation passed.")
+    return 0
+
+
+def inject_manifest_version(path: str) -> int:
+    """Replace the <!--MANIFEST_VERSION--> placeholder in docs/index.html."""
+    manifest_path = "deploy/ota/manifest.json"
+    with open(manifest_path) as f:
+        version = json.load(f).get("latest_version", "0.0.0")
+    with open(path, encoding="utf-8") as f:
+        html = f.read()
+    html = html.replace("<!--MANIFEST_VERSION-->", version)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(html)
+    print("Injected manifest version: {}".format(version))
+    return 0
+
+
 def main() -> int:
     if len(sys.argv) < 2:
-        print("usage: scan-report.py <bandit|shellcheck|manifest> ...")
+        print("usage: scan-report.py <bandit|shellcheck|manifest|htmlcheck|inject> ...")
         return 2
     kind = sys.argv[1]
     if kind == "bandit":
@@ -120,6 +150,14 @@ def main() -> int:
             return 2
         update_manifest(sys.argv[2:])
         return 0
+    if kind == "htmlcheck":
+        if len(sys.argv) != 3:
+            return 2
+        return check_html(sys.argv[2])
+    if kind == "inject":
+        if len(sys.argv) != 3:
+            return 2
+        return inject_manifest_version(sys.argv[2])
     print("unknown report kind: {}".format(kind))
     return 2
 

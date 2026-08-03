@@ -30,25 +30,7 @@ jobs:
       - name: Validate HTML
         run: |
           if [ -f docs/index.html ]; then
-            python -c "
-          import re, sys
-          with open('docs/index.html') as f:
-              html = f.read()
-          errors = []
-          if '<html' not in html.lower():
-              errors.append('Missing <html> tag')
-          if '<head' not in html.lower():
-              errors.append('Missing <head> tag')
-          if '<body' not in html.lower():
-              errors.append('Missing <body> tag')
-          if '<title' not in html.lower():
-              errors.append('Missing <title> tag')
-          if errors:
-              for e in errors:
-                  print(f'Error: {e}', file=sys.stderr)
-              sys.exit(1)
-          print('HTML validation passed.')
-          "
+            python3 deploy/github/scan-report.py htmlcheck docs/index.html
           fi
 
       - name: Build static assets
@@ -60,18 +42,7 @@ jobs:
       - name: Inject manifest data
         run: |
           if [ -f docs/index.html ] && [ -f deploy/ota/manifest.json ]; then
-            python -c "
-          import json
-          with open('deploy/ota/manifest.json') as f:
-              m = json.load(f)
-          with open('docs/index.html') as f:
-              html = f.read()
-          version = m.get('latest_version', '0.0.0')
-          html = html.replace('<!--MANIFEST_VERSION-->', version)
-          with open('docs/index.html', 'w') as f:
-              f.write(html)
-          print(f'Injected manifest version: {version}')
-          "
+            python3 deploy/github/scan-report.py inject docs/index.html
           fi
 
       - name: Prepare Pages artifact
@@ -117,7 +88,7 @@ jobs:
 
       - name: Verify manifest is accessible
         run: |
-          MANIFEST_URL="https://raw.githubusercontent.com/${{ github.repository }}/main/deploy/ota/manifest.json"
+          MANIFEST_URL="https://raw.githubusercontent.com/${{ github.repository }}/master/deploy/ota/manifest.json"
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$MANIFEST_URL" || echo "000")
           echo "Manifest HTTP status: $HTTP_STATUS"
 
