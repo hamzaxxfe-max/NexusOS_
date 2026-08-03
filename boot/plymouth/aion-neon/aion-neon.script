@@ -1,0 +1,78 @@
+# Aion Neon — neon-blue infinity loop boot splash
+# Script plugin: https://www.freedesktop.org/wiki/Software/Plymouth/Scripts/
+
+# Dark navy gradient background
+Window.SetBackgroundTopColor(0.01, 0.02, 0.05);
+Window.SetBackgroundBottomColor(0.00, 0.03, 0.10);
+
+global.glow = Image("glow.png");
+
+global.W = Window.GetWidth();
+global.H = Window.GetHeight();
+global.cx = global.W / 2;
+global.cy = global.H / 2;
+
+# Lemniscate (infinity) curve amplitude
+if (global.W < global.H)
+  global.a = global.W * 0.28;
+else
+  global.a = global.H * 0.28;
+
+# Comet trail: 1 head + 14 ghost dots
+global.N = 15;
+for (i = 0; i < global.N; i++)
+{
+  size = 96 * (global.N - i) / global.N;
+  global.images[i] = global.glow.Scale(size, size);
+  global.trail[i] = Sprite(global.images[i]);
+  global.trail[i].SetZ(0 - i);
+}
+
+# Brand label under the loop
+global.title = Image.Text("A I O N", 0.35, 0.85, 1.0);
+global.title_sprite = Sprite(global.title);
+global.title_sprite.SetPosition(global.W / 2 - global.title.GetWidth() / 2, global.cy + global.a + 30, 50);
+
+global.progress = 0;
+
+fun refresh_callback ()
+{
+  global.progress = global.progress + 1;
+  t = global.progress / 60.0;
+  for (i = 0; i < global.N; i++)
+  {
+    # Ghosts trail the head along the curve
+    dt = 0.0 - i * 0.35;
+    s = Math.Sin(t + dt);
+    c = Math.Cos(t + dt);
+    denom = 1 + s * s;
+    x = global.cx + global.a * (c / denom);
+    y = global.cy + global.a * (s * c / denom);
+    size = 96 * (global.N - i) / global.N;
+    global.trail[i].SetPosition(x - size / 2, y - size / 2, 0 - i);
+    global.trail[i].SetOpacity((global.N - i) / global.N * 0.95);
+  }
+}
+
+Plymouth.SetRefreshFunction(refresh_callback);
+
+# Boot progress bar (thin neon line at bottom)
+global.bar = Sprite();
+
+fun progress_callback (duration, progress)
+{
+  w = Math.Int(400 * progress);
+  if (w < 1)
+    w = 1;
+  global.bar.SetImage(global.glow.Scale(w, 6));
+  global.bar.SetPosition(global.W / 2 - 200, global.H - 40, 40);
+  global.bar.SetOpacity(0.7);
+}
+
+Plymouth.SetBootProgressFunction(progress_callback);
+
+fun quit_callback ()
+{
+}
+
+Plymouth.SetQuitFunction(quit_callback);

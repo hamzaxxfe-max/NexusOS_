@@ -64,6 +64,7 @@ pacstrap /mnt \
     base linux linux-firmware \
     btrfs-progs \
     systemd-boot \
+    plymouth \
     networkmanager \
     sudo \
     git \
@@ -75,6 +76,26 @@ genfstab -U /mnt >> /mnt/etc/fstab
 
 # ── BLS + dual-root + Auto Rollback setup ────────────────────────────
 log "Configuring BLS dual-root boot with auto rollback..."
+
+# ── Plymouth boot splash theme ────────────────────────────────────────
+# Install Aion Neon theme into the target before mkinitcpio rebuilds.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+THEME_DIR="${SCRIPT_DIR}/../../boot/plymouth/aion-neon"
+if [[ -d "${THEME_DIR}" ]]; then
+    mkdir -p /mnt/usr/share/plymouth/themes/aion-neon
+    cp -a "${THEME_DIR}/"* /mnt/usr/share/plymouth/themes/aion-neon/
+    mkdir -p /mnt/etc/plymouth
+    cat > /mnt/etc/plymouth/plymouthd.conf <<'PLYCONF'
+[Daemon]
+Theme=aion-neon
+ShowDelay=0
+DeviceTimeout=8
+PLYCONF
+    log "  aion-neon Plymouth theme installed"
+else
+    warn "  Plymouth theme not found: ${THEME_DIR}"
+fi
+
 arch-chroot /mnt /bin/bash <<'CHROOT'
     # Hostname
     echo "aion" > /etc/hostname
@@ -280,9 +301,10 @@ MARK_GOOD
     # Enable systemd-bless-boot (auto-count failed boots)
     systemctl enable systemd-bless-boot.service
 
-    # Initramfs with btrfs
+    # Initramfs with btrfs + plymouth boot splash
     sed -i 's/^MODULES=()/MODULES=(btrfs)/' /etc/mkinitcpio.conf
     sed -i 's/^BINARIES=()/BINARIES=(\/usr\/bin\/btrfs)/' /etc/mkinitcpio.conf
+    sed -i 's/^HOOKS=.*/HOOKS=(base udev plymouth autodetect modconf kms keyboard keymap consolefont block filesystems fsck)/' /etc/mkinitcpio.conf
     mkinitcpio -P
 
     # Enable services

@@ -505,6 +505,17 @@ gpgme
 nss
 p11-kit
 
+# --- Aion feature runtime dependencies ---
+# quick-resume: process checkpoint/restore
+criu
+# cloud-sync: cloud save backup/restore
+rclone
+# zero-lag-record: x11grab window geometry fallback
+xdotool
+# security-bypass-daemon: game sandboxing (inotify fallback is stdlib-only,
+# so python-inotify_simple — an AUR-only package — is intentionally NOT used)
+bubblewrap
+
 # --- Development ---
 gcc
 git
@@ -549,6 +560,10 @@ inputplumber
 ananicy-cpp
 goverlay
 
+# --- Emulation ---
+retroarch
+libretro-core-info
+
 # --- Security Tools ---
 polkit
 bolt
@@ -566,6 +581,9 @@ gst-plugins-base
 gst-plugins-good
 gst-plugins-bad
 gst-plugins-ugly
+
+# --- Boot splash ---
+plymouth
 
 # --- Misc ---
 power-profiles-daemon
@@ -1132,7 +1150,29 @@ deploy_all_components() {
     deploy_hub_components
     deploy_config_components
     deploy_ota_components
+    deploy_boot_splash
     log_success "All components deployed"
+}
+
+# Install the Aion Neon Plymouth boot splash theme.
+deploy_boot_splash() {
+    log_info "Deploying Plymouth boot splash..."
+
+    local theme_src="${SCRIPT_DIR}/boot/plymouth/aion-neon"
+    if [[ -d "${theme_src}" ]]; then
+        mkdir -p "${AIROOTFS}/usr/share/plymouth/themes/aion-neon"
+        cp -a "${theme_src}/"* "${AIROOTFS}/usr/share/plymouth/themes/aion-neon/"
+        mkdir -p "${AIROOTFS}/etc/plymouth"
+        cat > "${AIROOTFS}/etc/plymouth/plymouthd.conf" << 'PLYCONF'
+[Daemon]
+Theme=aion-neon
+ShowDelay=0
+DeviceTimeout=8
+PLYCONF
+        log_success "  boot/plymouth/aion-neon → /usr/share/plymouth/themes/aion-neon/ + plymouthd.conf"
+    else
+        log_warn "  boot/plymouth/aion-neon/ not found, skipping"
+    fi
 }
 
 # Copy game tooling (tweak hub, wine installer) into the ISO filesystem.
@@ -1156,7 +1196,15 @@ deploy_games_components() {
         mkdir -p "${AIROOTFS}/opt/aion/games/wine-installer"
         cp -a "${SCRIPT_DIR}/games/wine-installer/"*.py "${AIROOTFS}/opt/aion/games/wine-installer/" 2>/dev/null || true
         cp -a "${SCRIPT_DIR}/games/wine-installer/wine-optimize.sh" "${AIROOTFS}/opt/aion/games/wine-installer/" 2>/dev/null || true
-        log_success "  games/wine-installer → /opt/aion/games/wine-installer/"
+        log_success "  games/wine-installer  /opt/aion/games/wine-installer/"
+    fi
+
+    if [[ -d "${SCRIPT_DIR}/games/emulation" ]]; then
+        mkdir -p "${AIROOTFS}/opt/aion/games/emulation"
+        cp -a "${SCRIPT_DIR}/games/emulation/"*.py "${AIROOTFS}/opt/aion/games/emulation/" 2>/dev/null || true
+        chmod +x "${AIROOTFS}/opt/aion/games/emulation/"*.py 2>/dev/null || true
+        ln -sf /opt/aion/games/emulation/aion-emu-framework.py "${AIROOTFS}/usr/local/bin/aion-emu"
+        log_success "  games/emulation  /opt/aion/games/emulation/ + aion-emu"
     fi
 }
 
@@ -1773,7 +1821,7 @@ configure_mkinitcpio() {
 MODULES=(btrfs amdgpu radeon i915 nvidia nvidia_modeset nvidia_uvm nvidia_drm)
 BINARIES=()
 FILES=()
-HOOKS=(base udev autodetect modconf kms keyboard keymap consolefont block filesystems fsck)
+HOOKS=(base udev plymouth autodetect modconf kms keyboard keymap consolefont block filesystems fsck)
 COMPRESSION="zstd"
 COMPRESSION_OPTIONS=(-9)
 MKINIEOF
