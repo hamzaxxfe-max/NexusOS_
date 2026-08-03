@@ -10,9 +10,12 @@ A complete gaming operating system built on Arch Linux:
 - **Gaming kernel** — CachyOS BORE scheduler, AutoFDO, PGO optimizations
 - **Pre-compiled NVIDIA** — No dkms, matched to kernel, DRM modeset enabled
 - **Full gaming stack** — Steam, Proton/GE-Proton, Heroic, Lutris, RetroArch
+- **Unified store** — one hub for Steam, Lutris, Heroic and Bottles libraries
+- **Zero-setup emulation** — one-command RetroArch PSX bridge (`aion-emu`)
+- **Neon boot splash** — animated Plymouth infinity-loop theme
 - **Steam Gaming Mode** — Console-like UI via Gamescope compositor
 - **Android apps** — Waydroid with SELinux sandbox isolation
-- **Quick Resume** — CRIU-based game freeze/restore (save game state to RAM)
+- **Quick Resume** — CRIU-based game freeze/restore (checkpoint to SSD)
 - **Dynamic VRAM** — Auto-scaling GTT allocation for AMD APUs
 - **Cloud Sync** — Rclone-based save sync (Google Drive, OneDrive, Nextcloud)
 - **Zero-Lag Recording** — NVENC/VA-API + PipeWire capture
@@ -89,16 +92,16 @@ sudo ./build/scripts/05-update-system.sh
 ## Testing
 
 ```bash
-# Full test suite (174 tests)
+# Full test suite (388 tests)
 python -m pytest tests/ -v
 
-# Validation tests only (44 tests)
+# Validation tests only (240 tests)
 python -m pytest tests/validation/ -v
 
-# Main test suite (89 tests)
+# Main test suite (108 tests)
 python -m pytest tests/test-aion.py -v
 
-# Regression tests (Linux only, 35 skipped on Windows)
+# Regression tests (Linux only, 36 skipped on Windows)
 python -m pytest tests/regression/ -v
 
 # Standalone math validation
@@ -109,7 +112,9 @@ python tests/test-all-math.py
 
 ```
 Aion/
-├── Aion-Builder.sh           # Master build script (1472 lines)
+├── Aion-Builder.sh           # Master build script (2073 lines)
+├── boot/
+│   └── plymouth/aion-neon/       # Neon-blue infinity loop boot splash
 ├── build/
 │   ├── build.sh                 # Modular build entry point
 │   └── scripts/
@@ -117,7 +122,8 @@ Aion/
 │       ├── 02-gaming-kernel.sh      # CachyOS BORE kernel
 │       ├── 03-gaming-stack.sh       # Gaming packages + Flatpak apps
 │       ├── 04-desktop-environment.sh # KDE + Gaming Mode sessions
-│       └── 05-update-system.sh      # Atomic updater + rollback tools
+│       ├── 05-update-system.sh      # Atomic updater + rollback tools
+│       └── 06-footprint-optimize.sh # Shrink image + remove cruft
 ├── config/
 │   └── aion-config.json      # Master system config
 ├── core/
@@ -142,7 +148,12 @@ Aion/
 │   └── icons/                   # Icon manager
 ├── games/
 │   ├── tweak-hub/               # GPU monitor + performance tweaking
-│   └── wine-installer/          # Wine game installer + .exe handler
+│   ├── wine-installer/          # Wine game installer + .exe handler
+│   └── emulation/               # Zero-setup RetroArch PSX bridge (aion-emu)
+├── hub/
+│   ├── aion-hub-server.py       # Local-first app/game portal
+│   ├── library-bridge.py        # Unified store (Steam/Lutris/Heroic)
+│   └── web/                     # Hub web assets
 ├── performance/
 │   ├── compression/             # Btrfs zstd:3 optimization
 │   ├── throttler/               # Resource throttling daemon
@@ -155,10 +166,10 @@ Aion/
 ├── calamares/                   # Calamares installer config
 ├── configs/gaming/              # MangoHud + vkBasalt configs
 ├── tests/
-│   ├── validation/              # Math + physics validation (44 tests)
+│   ├── validation/              # Feature + math validation (240 tests)
 │   ├── regression/              # Regression tests (Linux, 4 files)
-│   ├── security/                # Security tests (2 files)
-│   ├── test-aion.py          # Main test suite (89 tests)
+│   ├── security/                # Security tests (3 files)
+│   ├── test-aion.py          # Main test suite (108 tests)
 │   └── test-all-math.py         # Math validation runner
 ├── features/                      # Killer features
 │   ├── quick-resume.py           # CRIU game freeze/restore
@@ -188,11 +199,38 @@ Aion/
 - **Steam** + Proton + GE-Proton (out-of-box)
 - **Heroic Games Launcher** (Epic/GOG/Amazon)
 - **Lutris** (multi-platform game manager)
-- **RetroArch** + emulators (retro gaming)
+- **RetroArch** + PSX core (zero-setup emulation via `aion-emu`)
 - **MangoHud** (performance overlay, enabled by default)
 - **GameScope** (micro-compositor for tear-free gaming)
 - **vkBasalt** (CAS sharpening enabled)
 - **GameMode** (auto CPU/GPU optimization)
+
+### Unified Store (Aion Hub)
+One portal for everything you own, regardless of launcher:
+- Local-first web portal at `http://127.0.0.1:8931` (stdlib-only, no cloud)
+- Aggregates installed games from **Steam, Lutris, Heroic, Bottles, Aion-native**
+  and Flatpak apps into a single library (`hub/library-bridge.py`)
+- `GET /api/library` — unified installed-games list
+- `GET /api/library/stats` — per-source counts + total size
+- One-click install queue for catalog apps with per-client rate limiting
+
+### Zero-Setup Emulation (`aion-emu`)
+Drop PlayStation ROMs into `~/ROMs`, then:
+```bash
+aion-emu status              # Show RetroArch / core / BIOS state
+aion-emu setup               # Install RetroArch + PSX core + config
+aion-emu list                # List playable ROMs
+aion-emu launch "Spyro"      # Launch a ROM
+```
+- Auto-downloads the `pcsx_rearmed` core from RetroArch's buildbot
+- Auto-detects a PlayStation BIOS in `~/.config/retroarch/system`
+- Writes a neon-friendly default config only when none exists
+- Every step degrades gracefully: no network, no core, no BIOS — never hangs
+
+### Boot Splash
+- **Aion Neon** Plymouth theme (`boot/plymouth/aion-neon`)
+- Animated neon-blue infinity loop with comet trail + boot progress bar
+- Installed by default (mkinitcpio `plymouth` hook + `plymouthd.conf`)
 
 ### Android Integration (Waydroid)
 - Run Android apps natively on Linux
@@ -224,7 +262,7 @@ Aion/
 ## Killer Features
 
 ### Quick Resume (CRIU)
-Freeze any game to RAM and restore it later — like PS5's Activity Cards.
+Freeze any game to an SSD checkpoint and restore it later — like PS5's Activity Cards.
 ```bash
 aion-quick-resume freeze --game "Cyberpunk 2077"   # Freeze game
 aion-quick-resume restore --game "Cyberpunk 2077"  # Restore game
