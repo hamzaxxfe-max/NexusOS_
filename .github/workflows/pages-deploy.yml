@@ -1,4 +1,4 @@
-﻿name: Deploy Aion Website
+name: Deploy Aion Website
 
 on:
   push:
